@@ -23,7 +23,7 @@ class User(AbstractBaseUser, PermissionsMixin):
     )
 
     email = models.EmailField(unique=True)
-    full_name = models.CharField(max_length=100)
+    referral_code = models.CharField(max_length=100 , blank=True, null=True)
     user_type = models.CharField(max_length=10, choices=USER_TYPES)
  
 
@@ -33,7 +33,7 @@ class User(AbstractBaseUser, PermissionsMixin):
     objects = UserManager()
 
     USERNAME_FIELD = 'email'
-    REQUIRED_FIELDS = ['full_name', 'user_type']
+    REQUIRED_FIELDS = ['referral_code', 'user_type']
 
     def __str__(self):
         return self.email

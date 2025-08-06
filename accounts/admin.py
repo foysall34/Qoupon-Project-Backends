@@ -4,13 +4,13 @@ from .models import User
 
 class UserAdmin(BaseUserAdmin):
     # Admin panel এ যেসব ফিল্ড দেখাবে
-    list_display = ('id', 'email', 'full_name', 'user_type', 'is_active', 'is_staff')
+    list_display = ('id', 'email', 'referral_code', 'user_type', 'is_active', 'is_staff')
     list_filter = ('user_type', 'is_active', 'is_staff', 'is_superuser')
     
     # User create বা update করার সময় কোন কোন ফিল্ড দেখাবে
     fieldsets = (
         (None, {'fields': ('email', 'password')}),
-        ('Personal Info', {'fields': ('full_name', 'user_type')}),
+        ('Personal Info', {'fields': ('referral_code', 'user_type')}),
         ('Permissions', {'fields': ('is_active', 'is_staff', 'is_superuser', 'groups', 'user_permissions')}),
         ('Important dates', {'fields': ('last_login',)}),
     )
@@ -19,11 +19,11 @@ class UserAdmin(BaseUserAdmin):
     add_fieldsets = (
         (None, {
             'classes': ('wide',),
-            'fields': ('email', 'full_name', 'user_type', 'password1', 'password2'),
+            'fields': ('email', 'referral_code', 'user_type', 'password1', 'password2'),
         }),
     )
 
-    search_fields = ('email', 'full_name')
+    search_fields = ('email', 'referral_code')
     ordering = ('email',)
     filter_horizontal = ('groups', 'user_permissions',)
 

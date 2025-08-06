@@ -6,24 +6,13 @@ from rest_framework_simplejwt.tokens import RefreshToken
 
 class RegisterSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True)
-    confirm_password = serializers.CharField(write_only=True)
+
 
     class Meta:
         model = User
-        fields = ['email', 'full_name', 'password', 'confirm_password', 'user_type']
+        fields = ['email', 'referral_code', 'password',  'user_type']
 
-    def validate(self, data):
-        if data['password'] != data['confirm_password']:
-            raise serializers.ValidationError("Passwords do not match.")
-        return data
-
-    def create(self, validated_data):
-        validated_data.pop('confirm_password')
-        return User.objects.create_user(**validated_data)
-
-
-
-
+   
 
 class CustomLoginSerializer(serializers.Serializer):
     email = serializers.EmailField()
@@ -49,3 +38,33 @@ class CustomLoginSerializer(serializers.Serializer):
              "user_email" : user.email , 
             "message": "Login successful"
         }
+
+
+
+# forgot password 
+class ForgotPasswordSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+
+    def validate_email(self, value):
+        # ইমেলটি ডাটাবেজে আছে কিনা তা পরীক্ষা করা হচ্ছে
+        if not User.objects.filter(email=value).exists():
+            raise serializers.ValidationError("User with this email does not exist.")
+        return value
+
+
+class ResetPasswordSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+    otp = serializers.CharField(max_length=4, min_length=4)
+    password = serializers.CharField(write_only=True, style={'input_type': 'password'})
+    password2 = serializers.CharField(write_only=True, style={'input_type': 'password'})
+
+    def validate(self, data):
+        # পাসওয়ার্ড দুটি মিলছে কিনা তা পরীক্ষা করা হচ্ছে
+        if data['password'] != data['password2']:
+            raise serializers.ValidationError("Passwords do not match.")
+        
+        # ইমেলটি ডাটাবেজে আছে কিনা তা পরীক্ষা করা হচ্ছে
+        if not User.objects.filter(email=data['email']).exists():
+            raise serializers.ValidationError("User with this email does not exist.")
+            
+        return data

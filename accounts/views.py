@@ -1,92 +1,110 @@
+from rest_framework import status
+from rest_framework.response import Response
 from rest_framework.views import APIView
-from rest_framework.response import Response
-from rest_framework import status
-from .serializers import RegisterSerializer, CustomLoginSerializer
-from rest_framework_simplejwt.tokens import RefreshToken
-from rest_framework.decorators import api_view
-from rest_framework.response import Response
-from rest_framework import status
+from rest_framework_simplejwt.views import TokenObtainPairView
+from .serializers import (
+    UserRegistrationSerializer, 
+    VerifyOTPSerializer,
+    ForgotPasswordSerializer,
+    SetNewPasswordSerializer
+)
 from .models import User
-from .serializers import ForgotPasswordSerializer, ResetPasswordSerializer
-import random
-from django.core.mail import send_mail
-from django.conf import settings
+from .utils import generate_otp, send_otp_via_email
+from django.utils import timezone
+from datetime import timedelta
 
-def get_tokens_for_user(user):
-    refresh = RefreshToken.for_user(user)
-    return {
-        'refresh': str(refresh),
-        'access': str(refresh.access_token),
-    }
-class RegisterView(APIView):
+# 1. Register API
+class UserRegistrationView(APIView):
     def post(self, request):
-        serializer = RegisterSerializer(data=request.data)
+        serializer = UserRegistrationSerializer(data=request.data)
         if serializer.is_valid():
             user = serializer.save()
+            
+            # OTP তৈরি ও সেভ করুন
+            otp = generate_otp()
+            user.otp = otp
+            user.otp_created_at = timezone.now()
+            user.save()
+            
+            # ইমেইলে OTP পাঠান
+            send_otp_via_email(user.email, otp)
+            
             return Response({
-                "message": "Registration Successfully Completed.",
-                "email": user.email,
-                "referral_code": user.referral_code,
-                "user_type" : user.user_type
+                'message': 'Registration successful! Please check your email for OTP.'
             }, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-class CustomLoginView(APIView):
+# 2. Verify OTP API
+class VerifyOTPView(APIView):
     def post(self, request):
-        serializer = CustomLoginSerializer(data=request.data)
+        serializer = VerifyOTPSerializer(data=request.data)
         if serializer.is_valid():
-            return Response(serializer.validated_data, status=status.HTTP_200_OK)
-        return Response(serializer.errors, status=status.HTTP_401_UNAUTHORIZED)
+            email = serializer.validated_data['email']
+            otp = serializer.validated_data['otp']
+            
+            try:
+                user = User.objects.get(email=email)
+            except User.DoesNotExist:
+                return Response({'error': 'User not found.'}, status=status.HTTP_404_NOT_FOUND)
 
-# Forgot password 
-@api_view(['POST'])
-def forgot_password_view(request):
-    serializer = ForgotPasswordSerializer(data=request.data)
-    if serializer.is_valid():
-        email = serializer.validated_data['email']
-        user = User.objects.get(email=email)
+            # OTP মেয়াদোত্তীর্ণ হয়েছে কিনা তা পরীক্ষা করুন (যেমন, ১০ মিনিট)
+            if user.otp == otp and timezone.now() < user.otp_created_at + timedelta(minutes=10):
+                user.is_active = True
+                user.otp = None # OTP ব্যবহারের পর মুছে দিন
+                user.otp_created_at = None
+                user.save()
+                return Response({'message': 'Account activated successfully!'}, status=status.HTTP_200_OK)
+            else:
+                return Response({'error': 'Invalid or expired OTP.'}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-        otp_code = str(random.randint(1000, 9999))
-        user.otp = otp_code
-        user.save()
+# 3. Login API (SimpleJWT থেকে)
+# simple-jwt এর ডিফল্ট ভিউ ব্যবহার করাই যথেষ্ট কারণ এটি সক্রিয় ব্যবহারকারী চেক করে।
+# এর জন্য আলাদা ভিউ লেখার প্রয়োজন নেই। শুধু URL কনফিগার করলেই হবে।
 
-   
-        subject = 'Your Password Reset OTP'
-        message = f'Your OTP for password reset is: {otp_code}'
-        from_email = settings.EMAIL_HOST_USER
-        recipient_list = [email]
-        
-        try:
-            send_mail(subject, message, from_email, recipient_list)
-        except Exception as e:
-            return Response({'error': 'Failed to send OTP email.'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+# 4. Forgot Password API
+class ForgotPasswordView(APIView):
+    def post(self, request):
+        serializer = ForgotPasswordSerializer(data=request.data)
+        if serializer.is_valid():
+            email = serializer.validated_data['email']
+            
+            try:
+                user = User.objects.get(email=email, is_active=True)
+            except User.DoesNotExist:
+                return Response({'error': 'Active user with this email not found.'}, status=status.HTTP_404_NOT_FOUND)
+            
+            otp = generate_otp()
+            user.otp = otp
+            user.otp_created_at = timezone.now()
+            user.save()
+            
+            send_otp_via_email(user.email, otp)
+            
+            return Response({'message': 'OTP for password reset has been sent to your email.'}, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-        return Response({'message': 'OTP has been sent to your email.'}, status=status.HTTP_200_OK)
-    
-    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+# 5. Set New Password API
+class SetNewPasswordView(APIView):
+    def post(self, request):
+        serializer = SetNewPasswordSerializer(data=request.data)
+        if serializer.is_valid():
+            email = serializer.validated_data['email']
+            otp = serializer.validated_data['otp']
+            password = serializer.validated_data['password']
 
-# --- নতুন পাসওয়ার্ড সেট করার ভিউ ---
-@api_view(['POST'])
-def reset_password_view(request):
-    serializer = ResetPasswordSerializer(data=request.data)
-    if serializer.is_valid():
-        email = serializer.validated_data['email']
-        otp = serializer.validated_data['otp']
-        password = serializer.validated_data['password']
+            try:
+                user = User.objects.get(email=email)
+            except User.DoesNotExist:
+                return Response({'error': 'User not found.'}, status=status.HTTP_404_NOT_FOUND)
 
-        user = User.objects.get(email=email)
-
-        # OTP check
-
-        if user.otp != otp:
-            return Response({'error': 'Invalid OTP.'}, status=status.HTTP_400_BAD_REQUEST)
-
-        # new password check
-        user.set_password(password)
-        user.otp = None  
-        user.save()
-
-        return Response({'message': 'Password has been reset successfully.'}, status=status.HTTP_200_OK)
-
-    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            if user.otp == otp and timezone.now() < user.otp_created_at + timedelta(minutes=10):
+                user.set_password(password)
+                user.otp = None # OTP ব্যবহারের পর মুছে দিন
+                user.otp_created_at = None
+                user.save()
+                return Response({'message': 'Password has been reset successfully.'}, status=status.HTTP_200_OK)
+            else:
+                return Response({'error': 'Invalid or expired OTP.'}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

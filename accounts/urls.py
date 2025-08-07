@@ -1,19 +1,22 @@
 from django.urls import path
-from . import views
-from .views import RegisterView, CustomLoginView
-from rest_framework_simplejwt.views import (
-    TokenObtainPairView,
-    TokenRefreshView,
-    TokenVerifyView,
+from .views import (
+    UserRegistrationView,
+    VerifyOTPView,
+    ForgotPasswordView,
+    SetNewPasswordView
 )
+from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
+
 urlpatterns = [
-    path('register/', RegisterView.as_view()),
-    path('login/', CustomLoginView.as_view()),
-    path('token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
-    path('login/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
-    path('login/token/verify/', TokenVerifyView.as_view(), name='token_verify'),
-
-    path('forgot-password/', views.forgot_password_view, name='forgot-password'),
-    path('update-password/', views.reset_password_view, name='reset-password'),
-
+    # Authentication APIs
+    path('register/', UserRegistrationView.as_view(), name='register'),
+    path('verify-otp/', VerifyOTPView.as_view(), name='verify-otp'),
+    
+    # Login API (using simple-jwt)
+    path('login/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
+    path('login/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
+    
+    # Password Reset APIs
+    path('forgot-password/', ForgotPasswordView.as_view(), name='forgot-password'),
+    path('set-new-password/', SetNewPasswordView.as_view(), name='set-new-password'),
 ]

@@ -82,11 +82,7 @@ def place_list(request):
 # --- see specific place ---
 @api_view(['GET', 'PUT', 'PATCH', 'DELETE'])
 def place_detail(request, pk):
-    """
-    GET: একটি নির্দিষ্ট স্থান দেখায়।
-    PUT/PATCH: একটি নির্দিষ্ট স্থান আপডেট করে।
-    DELETE: একটি নির্দিষ্ট স্থান ডিলিট করে।
-    """
+    
     try:
         place = Place.objects.get(pk=pk)
     except Place.DoesNotExist:

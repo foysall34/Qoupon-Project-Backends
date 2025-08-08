@@ -3,7 +3,8 @@ from .views import (
     UserRegistrationView,
     VerifyOTPView,
     ForgotPasswordView,
-    SetNewPasswordView
+    SetNewPasswordView,
+    CustomLoginView
 )
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
@@ -13,7 +14,7 @@ urlpatterns = [
     path('verify-otp/', VerifyOTPView.as_view(), name='verify-otp'),
     
     # Login API (using simple-jwt)
-    path('login/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
+    path('login/', CustomLoginView.as_view(), name='token_obtain_pair'),
     path('login/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     
     # Password Reset APIs

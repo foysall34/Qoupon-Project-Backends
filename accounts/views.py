@@ -6,12 +6,24 @@ from .serializers import (
     UserRegistrationSerializer, 
     VerifyOTPSerializer,
     ForgotPasswordSerializer,
-    SetNewPasswordSerializer
+    SetNewPasswordSerializer,
+    CustomTokenObtainPairSerializer
 )
 from .models import User
 from .utils import generate_otp, send_otp_via_email
 from django.utils import timezone
 from datetime import timedelta
+
+
+
+
+class CustomLoginView(TokenObtainPairView):
+    """
+    কাস্টম লগইন ভিউ যা রেসপন্সে অতিরিক্ত ডেটা পাঠায়।
+    """
+    serializer_class = CustomTokenObtainPairSerializer
+
+
 
 # 1. Register API
 class UserRegistrationView(APIView):
@@ -20,13 +32,13 @@ class UserRegistrationView(APIView):
         if serializer.is_valid():
             user = serializer.save()
             
-            # OTP তৈরি ও সেভ করুন
+            # OTP generate
             otp = generate_otp()
             user.otp = otp
             user.otp_created_at = timezone.now()
             user.save()
             
-            # ইমেইলে OTP পাঠান
+            # send otp to gmail 
             send_otp_via_email(user.email, otp)
             
             return Response({
@@ -47,10 +59,10 @@ class VerifyOTPView(APIView):
             except User.DoesNotExist:
                 return Response({'error': 'User not found.'}, status=status.HTTP_404_NOT_FOUND)
 
-            # OTP মেয়াদোত্তীর্ণ হয়েছে কিনা তা পরীক্ষা করুন (যেমন, ১০ মিনিট)
+            # OTP is expired or not 
             if user.otp == otp and timezone.now() < user.otp_created_at + timedelta(minutes=10):
                 user.is_active = True
-                user.otp = None # OTP ব্যবহারের পর মুছে দিন
+                user.otp = None # OTP remove
                 user.otp_created_at = None
                 user.save()
                 return Response({'message': 'Account activated successfully!'}, status=status.HTTP_200_OK)
@@ -58,9 +70,7 @@ class VerifyOTPView(APIView):
                 return Response({'error': 'Invalid or expired OTP.'}, status=status.HTTP_400_BAD_REQUEST)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-# 3. Login API (SimpleJWT থেকে)
-# simple-jwt এর ডিফল্ট ভিউ ব্যবহার করাই যথেষ্ট কারণ এটি সক্রিয় ব্যবহারকারী চেক করে।
-# এর জন্য আলাদা ভিউ লেখার প্রয়োজন নেই। শুধু URL কনফিগার করলেই হবে।
+
 
 # 4. Forgot Password API
 class ForgotPasswordView(APIView):
@@ -101,7 +111,7 @@ class SetNewPasswordView(APIView):
 
             if user.otp == otp and timezone.now() < user.otp_created_at + timedelta(minutes=10):
                 user.set_password(password)
-                user.otp = None # OTP ব্যবহারের পর মুছে দিন
+                user.otp = None 
                 user.otp_created_at = None
                 user.save()
                 return Response({'message': 'Password has been reset successfully.'}, status=status.HTTP_200_OK)

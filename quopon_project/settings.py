@@ -21,6 +21,7 @@ ALLOWED_HOSTS = ['*']
 # Application definition
 
 INSTALLED_APPS = [
+    "jazzmin", 
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -34,6 +35,83 @@ INSTALLED_APPS = [
      'rest_framework',
     
 ]
+
+JAZZMIN_SETTINGS = {
+    "site_title": "My Admin Panel",
+    "site_header": "Administration",
+    "site_brand": "MyBrand",
+    "site_logo": "images/my-logo.png",  
+    "welcome_sign": "স্বাগতম — প্রশাসক প্যানেলে!",
+    "search_model": ["auth.User"],
+    "custom_css": "css/custom.css",
+
+    # Top Menu
+    "topmenu_links": [
+        {"name": "Dashboard", "url": "admin:index", "permissions": ["auth.view_user"]},
+        {"name": "Website", "url": "/", "new_window": True},
+    ],
+
+    # Sidebar menu আইকন
+    "icons": {
+        "auth": "fas fa-users-cog",
+        "auth.user": "fas fa-user",
+        "auth.Group": "fas fa-users",
+    },
+
+    # App order
+    "order_with_respect_to": ["auth"],
+
+    # UI builder চালু
+    "show_ui_builder": True,
+
+    # ফর্ম লেআউট
+    "changeform_format": "horizontal_tabs",
+    "language_chooser": False,
+}
+
+
+
+JAZZMIN_UI_TWEAKS = {
+    "theme": "darkly",              
+    "dark_mode_theme": "darkly",    
+    "navbar_small_text": False,     
+    "footer_small_text": False,
+    "body_small_text": False,
+
+    # Navbar
+    "navbar_fixed": True,           
+    "layout_boxed": False,
+
+    "navbar_variant": "navbar-dark navbar-dark bg-dark",
+   
+
+    # Sidebar
+    "sidebar_fixed": True,
+    "sidebar_nav_small_text": False,
+    "sidebar_disable_expand": False,
+    "sidebar_nav_child_indent": True,
+    "sidebar_variant": "sidebar-dark-primary",
+
+    # রং এর অ্যাকসেন্ট
+    "accent": "accent-teal",        # সুন্দর টিল কালার
+    "brand_colour": "navbar-primary",
+
+    # Button style
+    "button_classes": {
+        "primary": "btn-primary",
+        "secondary": "btn-secondary",
+        "info": "btn-info",
+        "warning": "btn-warning",
+        "danger": "btn-danger",
+        "success": "btn-success"
+    }
+}
+
+
+
+
+
+
 AUTH_USER_MODEL = 'accounts.User'
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
@@ -156,6 +234,11 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/5.0/howto/static-files/
 
 STATIC_URL = 'static/'
+STATIC_URL = '/static/'
+
+STATICFILES_DIRS = [
+    BASE_DIR / "static",  
+]
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.0/ref/settings/#default-auto-field

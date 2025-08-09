@@ -18,9 +18,7 @@ from datetime import timedelta
 
 
 class CustomLoginView(TokenObtainPairView):
-    """
-    কাস্টম লগইন ভিউ যা রেসপন্সে অতিরিক্ত ডেটা পাঠায়।
-    """
+    
     serializer_class = CustomTokenObtainPairSerializer
 
 
@@ -62,7 +60,7 @@ class VerifyOTPView(APIView):
             # OTP is expired or not 
             if user.otp == otp and timezone.now() < user.otp_created_at + timedelta(minutes=10):
                 user.is_active = True
-                user.otp = None # OTP remove
+                user.otp = None 
                 user.otp_created_at = None
                 user.save()
                 return Response({'message': 'Account activated successfully!'}, status=status.HTTP_200_OK)

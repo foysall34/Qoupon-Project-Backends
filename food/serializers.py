@@ -27,13 +27,13 @@ class UserProfileDetailSerializer(serializers.ModelSerializer):
         }
 
 
-# --- POST অনুরোধের জন্য সিরিয়ালাইজার (শুধুমাত্র ডেটা তৈরি করার জন্য) ---
+# --- Post ---
 class UserProfileCreateSerializer(serializers.ModelSerializer):
-    user_email = serializers.EmailField(write_only=True, help_text="যে ইউজারের জন্য প্রোফাইল তৈরি করতে চান তার ইমেইল দিন।")
+    user_email = serializers.EmailField(write_only=True, help_text="give email ")
     favorite_category_names = serializers.ListField(
         child=serializers.CharField(),
         write_only=True,
-        help_text="পছন্দের ক্যাটাগরিগুলোর নামের তালিকা। যেমন: [\"Pizza & Pasta\", \"Asian Cuisine\"]"
+        help_text="show your chooseable : [\"Pizza & Pasta\", \"Asian Cuisine\"]"
     )
 
     class Meta:
@@ -47,13 +47,13 @@ class UserProfileCreateSerializer(serializers.ModelSerializer):
         try:
             user = User.objects.get(email=user_email)
         except User.DoesNotExist:
-            raise serializers.ValidationError({"user_email": f"'{user_email}' দিয়ে কোনো ইউজার খুঁজে পাওয়া যায়নি।"})
+            raise serializers.ValidationError({"user_email": f"'{user_email}' doesn't exist ..."})
 
-        # ইউজারের প্রোফাইল আগে থেকেই আছে কিনা তা পরীক্ষা করা
+        # Is exist or not user profile 
         if UserProfile.objects.filter(user=user).exists():
-            raise serializers.ValidationError({"user_email": "এই ইউজারের জন্য প্রোফাইল আগে থেকেই তৈরি করা আছে।"})
+            raise serializers.ValidationError({"user_email": "Prfile already created."})
 
-        # নাম দিয়ে ক্যাটাগরিগুলো খুঁজে বের করা
+        # search by category 
         categories = []
         missing_categories = []
         for name in category_names:
@@ -65,10 +65,10 @@ class UserProfileCreateSerializer(serializers.ModelSerializer):
         
         if missing_categories:
             raise serializers.ValidationError({
-                "favorite_category_names": f"এই ক্যাটাগরিগুলো পাওয়া যায়নি: {', '.join(missing_categories)}"
+                "favorite_category_names": f"Doesn't found : {', '.join(missing_categories)}"
             })
 
-        # নতুন প্রোফাইল তৈরি ও ক্যাটাগরি যুক্ত করা
+        # create new profile & category ..............
         profile = UserProfile.objects.create(user=user)
         profile.favorite_categories.set(categories)
         return profile
@@ -98,7 +98,7 @@ class PlaceSerializer(serializers.ModelSerializer):
         return "Address could not be geocoded."
 
     def _get_coordinates(self, address):
-        """ ঠিকানা থেকে অক্ষাংশ ও দ্রাঘিমাংশ বের করার জন্য একটি ফাংশন """
+        """ Find latitude & longitude function  """
         try:
             geolocator = Nominatim(user_agent="my_place_app") # একটি ইউনিক user_agent দিন
             location = geolocator.geocode(address)
@@ -116,8 +116,8 @@ class PlaceSerializer(serializers.ModelSerializer):
         lat, lon = self._get_coordinates(address)
 
         if lat is None or lon is None:
-            # যদি ঠিকানা খুঁজে না পাওয়া যায়
-            raise serializers.ValidationError({"address": "এই ঠিকানাটি খুঁজে পাওয়া যায়নি অথবা অবৈধ।"})
+            
+            raise serializers.ValidationError({"address": "this location can't find ."})
 
         # নতুন পাওয়া lat/lon ডেটাতে যোগ করা হচ্ছে
         validated_data['latitude'] = lat
@@ -129,11 +129,11 @@ class PlaceSerializer(serializers.ModelSerializer):
         """ স্থান আপডেট করার সময় যদি ঠিকানা পরিবর্তন হয়, তাহলে lat/lon আবার বের করা হবে """
         address = validated_data.get('address', instance.address)
 
-        # যদি ঠিকানা পরিবর্তন করা হয়
+        # if change the location 
         if 'address' in validated_data and validated_data['address'] != instance.address:
             lat, lon = self._get_coordinates(address)
             if lat is None or lon is None:
-                raise serializers.ValidationError({"address": "এই নতুন ঠিকানাটি খুঁজে পাওয়া যায়নি অথবা অবৈধ।"})
+                raise serializers.ValidationError({"address": "this location can't found .."})
             
             validated_data['latitude'] = lat
             validated_data['longitude'] = lon

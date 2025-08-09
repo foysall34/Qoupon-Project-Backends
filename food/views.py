@@ -10,8 +10,6 @@ from .serializers import PlaceSerializer
 
 @api_view(['GET', 'POST'])
 def food_category_list(request):
-
-    
     if request.method == 'GET':
         categories = FoodCategory.objects.all()
         serializer = FoodCategorySerializer(categories, many=True)
@@ -93,7 +91,7 @@ def place_detail(request, pk):
         return Response(serializer.data)
 
     elif request.method in ['PUT', 'PATCH']:
-        # partial=True দিলে PATCH অনুরোধ সঠিকভাবে কাজ করবে
+        # partial=True দিলে PATCH অনুরোধ সঠিকভাবে কাজ করবে ..
         serializer = PlaceSerializer(instance=place, data=request.data, partial=True)
         if serializer.is_valid():
             serializer.save()

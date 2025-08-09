@@ -12,7 +12,7 @@
 
 /* Food categories হেডারের টেক্সট সাদা */
 .content-header h1 {
-    color: rgb(255, 13, 13) !important;
+    color: rgb(116, 99, 242) !important;
 }
 
 
@@ -22,7 +22,7 @@
     --secondary: #374151;
     --accent: #0ebf84;   /* সবুজ accent */
     --link: #3b82f6;
-    --body-bg: #292f3c;
+    --body-bg: #000000 !important;
     --header-bg: #2d3327;
     --header-color: #f9fafb;
     --sidebar-bg: #2c2d1f;
@@ -47,5 +47,62 @@ button, .button {
     color: white !important;
 }
 table#result_list tbody th a {
-    color: white !important;
+    color: rgb(251, 131, 131) !important;
+}
+
+
+.selector select,
+.selector select option {
+    color: #000 !important; 
+    background-color: #fff;  
+}
+
+
+
+.selector select option:checked {
+    color: #fff !important; 
+    background-color: #007bff !important;
+}
+
+
+
+
+/* side bar  */
+/*
+/*
+ * ডিফল্ট সাইডবার মেনুর রঙ (হোভার বা সক্রিয় না থাকলে)
+ * (ঐচ্ছিক, আপনি চাইলে এটি বাদ দিতে পারেন)
+*/
+.nav-sidebar .nav-link {
+    background-color: transparent;
+}
+
+
+/*
+ * ধাপ ১: সক্রিয় (Active) মেনু আইটেমের ব্যাকগ্রাউন্ড টিল (Teal) করুন
+*/
+.nav-sidebar .nav-item.active > .nav-link,
+.nav-sidebar .nav-item.menu-open > .nav-link {
+    background-color: #008080 !important; /* Teal ব্যাকগ্রাউন্ড */
+    color: #ffffff !important;           /* লেখার রঙ সাদা */
+}
+
+/* সক্রিয় আইটেমের আইকনের রঙও সাদা করুন */
+.nav-sidebar .nav-item.active > .nav-link .nav-icon,
+.nav-sidebar .nav-item.menu-open > .nav-link .nav-icon {
+    color: #ffffff !important;
+}
+
+
+/*
+ * ধাপ ২: যেকোনো মেনু আইটেমের উপর হোভার করলে ব্যাকগ্রাউন্ড সাদা করুন
+*/
+.nav-sidebar .nav-item:hover > .nav-link {
+    background-color: #ffffff !important; /* সাদা ব্যাকগ্রাউন্ড */
+    color: #008080 !important;           /* লেখার রঙ টিল (Teal) করুন, যাতে দেখা যায় */
+}
+
+/* হোভার করার সময় আইকনের রঙও টিল (Teal) করুন */
+.nav-sidebar .nav-item:hover > .nav-link .nav-icon {
+    color: #008080 !important;
 }

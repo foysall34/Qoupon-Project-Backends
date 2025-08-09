@@ -1,5 +1,5 @@
 
-
+import os
 from pathlib import Path
 from decouple import config
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -37,11 +37,11 @@ INSTALLED_APPS = [
 ]
 
 JAZZMIN_SETTINGS = {
-    "site_title": "My Admin Panel",
-    "site_header": "Administration",
-    "site_brand": "MyBrand",
-    "site_logo": "images/my-logo.png",  
-    "welcome_sign": "স্বাগতম — প্রশাসক প্যানেলে!",
+    "site_title": "Admin Panel",
+    "site_header": "Foysal",
+    "site_brand": "Qoupon Apps",
+    "site_logo": "image/panel.jpeg",  
+    "welcome_sign": "welcome to admin !",
     "search_model": ["auth.User"],
     "custom_css": "css/custom.css",
 
@@ -88,12 +88,12 @@ JAZZMIN_UI_TWEAKS = {
     # Sidebar
     "sidebar_fixed": True,
     "sidebar_nav_small_text": False,
-    "sidebar_disable_expand": False,
+    "sidebar_disable_expand": True,
     "sidebar_nav_child_indent": True,
     "sidebar_variant": "sidebar-dark-primary",
 
     # রং এর অ্যাকসেন্ট
-    "accent": "accent-teal",        # সুন্দর টিল কালার
+    "accent": "accent-teal",    
     "brand_colour": "navbar-primary",
 
     # Button style
@@ -234,11 +234,15 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/5.0/howto/static-files/
 
 STATIC_URL = 'static/'
-STATIC_URL = '/static/'
 
+# For jazzmin 
+
+STATIC_ROOT = BASE_DIR / 'staticfiles'
 STATICFILES_DIRS = [
     BASE_DIR / "static",  
 ]
+
+
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.0/ref/settings/#default-auto-field

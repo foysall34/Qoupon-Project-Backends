@@ -15,6 +15,8 @@ urlpatterns = [
     
     # Login API (using simple-jwt)
     path('login/', CustomLoginView.as_view(), name='token_obtain_pair'),
+    path('token/', TokenObtainPairView.as_view(), name='token'),
+
     path('login/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     
     # Password Reset APIs

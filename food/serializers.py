@@ -1,9 +1,10 @@
 from rest_framework import serializers
-from .models import FoodCategory, UserProfile
+from .models import FoodCategory, Fvt_category
 from django.contrib.auth import get_user_model
 from .models import Place
 from geopy.geocoders import Nominatim
 from geopy.exc import GeocoderUnavailable
+
 
 User = get_user_model()
 
@@ -12,66 +13,33 @@ class FoodCategorySerializer(serializers.ModelSerializer):
         model = FoodCategory
         fields = ['id', 'name', 'emoji']
 
-class UserProfileDetailSerializer(serializers.ModelSerializer):
+
+
+class UserFvtDetailSerializer(serializers.ModelSerializer):
+    """
+    ইউজারের প্রোফাইল এবং তার পছন্দের ক্যাটাগরি দেখানোর জন্য।
+    """
     user_info = serializers.SerializerMethodField()
+    
+    # এখন FoodCategorySerializer সংজ্ঞায়িত আছে
     favorite_categories = FoodCategorySerializer(many=True, read_only=True)
 
     class Meta:
-        model = UserProfile
+        model = Fvt_category
         fields = ['id', 'user_info', 'favorite_categories']
     
     def get_user_info(self, obj):
+        """
+        ইউজারের তথ্য একটি কাস্টম অবজেক্ট হিসেবে রিটার্ন করে।
+        """
+        # --- সমাধান ২: obj.user.full_name এর পরিবর্তে obj.user.get_full_name() ব্যবহার ---
         return {
-            "username": obj.user.full_name,
+            # অথবা obj.user.username যদি শুধু ইউজারনেম চান
             "email": obj.user.email
         }
 
-
 # --- Post ---
-class UserProfileCreateSerializer(serializers.ModelSerializer):
-    user_email = serializers.EmailField(write_only=True, help_text="give email ")
-    favorite_category_names = serializers.ListField(
-        child=serializers.CharField(),
-        write_only=True,
-        help_text="show your chooseable : [\"Pizza & Pasta\", \"Asian Cuisine\"]"
-    )
 
-    class Meta:
-        model = UserProfile
-        fields = ['user_email', 'favorite_category_names']
-
-    def create(self, validated_data):
-        user_email = validated_data.get('user_email')
-        category_names = validated_data.get('favorite_category_names')
-
-        try:
-            user = User.objects.get(email=user_email)
-        except User.DoesNotExist:
-            raise serializers.ValidationError({"user_email": f"'{user_email}' doesn't exist ..."})
-
-        # Is exist or not user profile 
-        if UserProfile.objects.filter(user=user).exists():
-            raise serializers.ValidationError({"user_email": "Prfile already created."})
-
-        # search by category 
-        categories = []
-        missing_categories = []
-        for name in category_names:
-            try:
-                category = FoodCategory.objects.get(name__iexact=name.strip())
-                categories.append(category)
-            except FoodCategory.DoesNotExist:
-                missing_categories.append(name)
-        
-        if missing_categories:
-            raise serializers.ValidationError({
-                "favorite_category_names": f"Doesn't found : {', '.join(missing_categories)}"
-            })
-
-        # create new profile & category ..............
-        profile = UserProfile.objects.create(user=user)
-        profile.favorite_categories.set(categories)
-        return profile
     
 
 # Google Map serializers

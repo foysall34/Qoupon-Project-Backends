@@ -2,6 +2,13 @@
 import os
 from pathlib import Path
 from decouple import config
+from dotenv import load_dotenv 
+import cloudinary
+import cloudinary.uploader
+import cloudinary.api
+from datetime import timedelta
+
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -32,9 +39,24 @@ INSTALLED_APPS = [
     'accounts',
     'food',
     # 3rd party
-     'rest_framework',
+    'rest_framework',
+    'cloudinary_storage', 
+    'cloudinary',  
     
 ]
+
+load_dotenv(os.path.join(BASE_DIR, ".env")) 
+
+
+
+cloudinary.config( 
+  cloud_name = config("CLOUD_NAME"), 
+  api_key = config("CLOUD_API_KEY"), 
+  api_secret = config("CLOUD_API_SECRET") 
+)
+# ডিফল্ট ফাইল স্টোরেজ হিসেবে Cloudinary সেট করা হচ্ছে
+DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
+
 
 JAZZMIN_SETTINGS = {
     "site_title": "Admin Panel",
@@ -135,15 +157,6 @@ EMAIL_HOST_USER = config('EMAIL_HOST_USER')
 EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD')
 
 
-
-
-
-
-
-
-
-
-
 ROOT_URLCONF = 'quopon_project.urls'
 
 REST_FRAMEWORK = {
@@ -155,10 +168,10 @@ REST_FRAMEWORK = {
     ),
 }
 
-from datetime import timedelta
+
 
 SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(hours=6),  
+    'ACCESS_TOKEN_LIFETIME': timedelta(hours=8),  
     'REFRESH_TOKEN_LIFETIME': timedelta(days=1),    
     'ROTATE_REFRESH_TOKENS': False,
     'BLACKLIST_AFTER_ROTATION': True,

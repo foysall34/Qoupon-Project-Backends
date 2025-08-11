@@ -4,11 +4,13 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django.contrib.auth import get_user_model
 from .models import FoodCategory, Fvt_category
-from .serializers import FoodCategorySerializer , UserFvtDetailSerializer
-from .models import Place
-from .serializers import PlaceSerializer
+from .serializers import FoodCategorySerializer , UserFvtDetailSerializer ,  ProfileSerializer
+from .models import Place , Profile
+from .serializers import PlaceSerializer 
 from rest_framework.decorators import api_view, authentication_classes, permission_classes
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import AllowAny
+
 
 from rest_framework_simplejwt.authentication import JWTAuthentication 
 
@@ -33,7 +35,7 @@ User = get_user_model()
 
 @api_view(['GET', 'POST'])
 @authentication_classes([JWTAuthentication])
-@permission_classes([IsAuthenticated])
+@permission_classes([AllowAny])
 def manage_my_favorite_categories(request):
     
     current_user = request.user
@@ -50,7 +52,7 @@ def manage_my_favorite_categories(request):
 
         serializer = UserFvtDetailSerializer(fvt_profile)
         
-        # --- আপনার পছন্দের কাস্টম রেসপন্স তৈরি করা হচ্ছে ---
+       
         response_data = {
             "user_email": serializer.data['user_info']['email'],
             "user_favorite_categories": [category['name'] for category in serializer.data['favorite_categories']],
@@ -135,7 +137,7 @@ def place_detail(request, pk):
         return Response(serializer.data)
 
     elif request.method in ['PUT', 'PATCH']:
-        # partial=True দিলে PATCH অনুরোধ সঠিকভাবে কাজ করবে ..
+      
         serializer = PlaceSerializer(instance=place, data=request.data, partial=True)
         if serializer.is_valid():
             serializer.save()
@@ -145,3 +147,31 @@ def place_detail(request, pk):
     elif request.method == 'DELETE':
         place.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+    
+
+
+# For profile page api 
+
+@api_view(['GET', 'POST', 'PUT'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAuthenticated])
+def user_profile_view(request):
+   
+    # get_or_create: যদি প্রোফাইল থাকে তাহলে সেটি আনবে, না থাকলে নতুন তৈরি করবে।
+    # created ভেরিয়েবলটি বলে দেবে প্রোফাইলটি নতুন তৈরি হলো কিনা (True/False)।
+    profile, created = Profile.objects.get_or_create(user=request.user)
+
+    if request.method == 'GET':
+        serializer = ProfileSerializer(profile)
+        return Response(serializer.data)
+
+    elif request.method in ['PUT', 'POST']:
+        serializer = ProfileSerializer(profile, data=request.data, partial=False)
+        if serializer.is_valid():
+            serializer.save()
+            return Response({
+                "success": True,
+                "message": f"Profile successfully updated .",
+                "data": serializer.data
+            })
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

@@ -4,7 +4,7 @@ from django.conf import settings
 
 def generate_otp():
     """4-সংখ্যার একটি র‍্যান্ডম OTP তৈরি করে।"""
-    return str(random.randint(1000, 9999))
+    return str(random.randint(100000, 999999))
 
 def send_otp_via_email(email, otp):
     """

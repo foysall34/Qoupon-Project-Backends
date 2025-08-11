@@ -30,7 +30,7 @@ class User(AbstractBaseUser, PermissionsMixin):
  
 
 
-    otp = models.CharField(max_length=4, null=True, blank=True)
+    otp = models.CharField(max_length=6, null=True, blank=True)
     otp_created_at = models.DateTimeField(null=True, blank=True)
 
     is_active = models.BooleanField(default=True)

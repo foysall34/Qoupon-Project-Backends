@@ -17,14 +17,14 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
 
 class VerifyOTPSerializer(serializers.Serializer):
     email = serializers.EmailField()
-    otp = serializers.CharField(max_length=4)
+    otp = serializers.CharField(max_length=6)
 
 class ForgotPasswordSerializer(serializers.Serializer):
     email = serializers.EmailField()
 
 class SetNewPasswordSerializer(serializers.Serializer):
     email = serializers.EmailField()
-    otp = serializers.CharField(max_length=4)
+    otp = serializers.CharField(max_length=6)
     password = serializers.CharField(write_only=True)
 
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
@@ -38,5 +38,4 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         data['email'] = self.user.email
         data['user_type'] = self.user.user_type
   
-        
         return data

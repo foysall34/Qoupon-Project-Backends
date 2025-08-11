@@ -13,7 +13,8 @@ from .models import User
 from .utils import generate_otp, send_otp_via_email
 from django.utils import timezone
 from datetime import timedelta
-
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import AllowAny
 
 
 
@@ -24,6 +25,7 @@ class CustomLoginView(TokenObtainPairView):
 
 
 # 1. Register API
+@permission_classes([AllowAny])
 class UserRegistrationView(APIView):
     def post(self, request):
         serializer = UserRegistrationSerializer(data=request.data)
@@ -45,6 +47,7 @@ class UserRegistrationView(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 # 2. Verify OTP API
+@permission_classes([AllowAny])
 class VerifyOTPView(APIView):
     def post(self, request):
         serializer = VerifyOTPSerializer(data=request.data)
@@ -71,6 +74,7 @@ class VerifyOTPView(APIView):
 
 
 # 4. Forgot Password API
+@permission_classes([AllowAny])
 class ForgotPasswordView(APIView):
     def post(self, request):
         serializer = ForgotPasswordSerializer(data=request.data)
@@ -89,11 +93,12 @@ class ForgotPasswordView(APIView):
             
             send_otp_via_email(user.email, otp)
             
-            return Response({'message': 'OTP for password reset has been sent to your email.'}, status=status.HTTP_200_OK)
+            return Response({'message': 'OTP has been sent to your email.'}, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 # 5. Set New Password API
+@permission_classes([AllowAny])
 class SetNewPasswordView(APIView):
     def post(self, request):
         serializer = SetNewPasswordSerializer(data=request.data)

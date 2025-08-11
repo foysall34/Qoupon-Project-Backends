@@ -100,24 +100,35 @@ class ForgotPasswordView(APIView):
 # 5. Set New Password API
 @permission_classes([AllowAny])
 class SetNewPasswordView(APIView):
-    def post(self, request):
+    
+    def post(self, request, *args, **kwargs):
+    
         serializer = SetNewPasswordSerializer(data=request.data)
+        
         if serializer.is_valid():
             email = serializer.validated_data['email']
-            otp = serializer.validated_data['otp']
             password = serializer.validated_data['password']
 
             try:
+                # Find the user by their email address
                 user = User.objects.get(email=email)
             except User.DoesNotExist:
-                return Response({'error': 'User not found.'}, status=status.HTTP_404_NOT_FOUND)
+                # To prevent attackers from checking which emails are registered,
+               
+                return Response(
+                    {'message': 'If an account with this email exists, the password has been reset.'},
+                    status=status.HTTP_200_OK
+                )
+            # Set the new password directly
+            user.set_password(password)
 
-            if user.otp == otp and timezone.now() < user.otp_created_at + timedelta(minutes=10):
-                user.set_password(password)
-                user.otp = None 
-                user.otp_created_at = None
-                user.save()
-                return Response({'message': 'Password has been reset successfully.'}, status=status.HTTP_200_OK)
-            else:
-                return Response({'error': 'Invalid or expired OTP.'}, status=status.HTTP_400_BAD_REQUEST)
+            user.otp = None 
+            user.otp_expiry = None 
+            user.save()
+            
+            return Response(
+                {'message': 'Password has been reset successfully.'}, 
+                status=status.HTTP_200_OK
+            )
+            
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

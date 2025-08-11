@@ -38,6 +38,7 @@ INSTALLED_APPS = [
     # app 
     'accounts',
     'food',
+    'homepage',
     # 3rd party
     'rest_framework',
     'cloudinary_storage', 

@@ -34,9 +34,9 @@ class Shop(models.Model):
     has_offers = models.BooleanField(default=False)
 
     PRICE_CHOICES = (
-        (1, '$'),
-        (2, '$$'),
-        (3, '$$$'),
+        (1, 'start'),
+        (2, 'medium'),
+        (3, 'high'),
     )
     price_range = models.IntegerField(choices=PRICE_CHOICES, default=1)
     

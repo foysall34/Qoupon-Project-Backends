@@ -24,6 +24,8 @@ class CategorySerializer(serializers.ModelSerializer):
 
 class ShopSerializer(serializers.ModelSerializer):
     category_name = serializers.CharField(source='category.name', read_only=True)
+    logo_url = serializers.SerializerMethodField()
+    cover_image_url = serializers.SerializerMethodField()
     
     class Meta:
         model = Shop
@@ -33,8 +35,8 @@ class ShopSerializer(serializers.ModelSerializer):
             'category',
             'category_name',
             'description',
-            'logo', # Cloudinary URL
-            'cover_image', # Cloudinary URL
+            'logo_url', # Cloudinary URL
+            'cover_image_url', # Cloudinary URL
             'rating',
             'delivery_fee',
             'delivery_time_minutes',
@@ -42,6 +44,10 @@ class ShopSerializer(serializers.ModelSerializer):
             'is_beyond_neighborhood',
             'allows_pickup', 'has_offers', 'price_range'
         ]
+        extra_kwargs = {
+            'logo': {'write_only': True},
+            'cover_iamge':{'write_only': True}
+        }
 
 class RecentSearchSerializer(serializers.ModelSerializer):
     class Meta:

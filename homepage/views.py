@@ -21,10 +21,10 @@ class CategoryListView(generics.ListAPIView):
 
 # ২. Beyond Your Neighborhood API
 class BeyondNeighborhoodView(generics.ListAPIView):
-   
+    permission_classes = [AllowAny]
     queryset = Shop.objects.filter(is_beyond_neighborhood=True)
     serializer_class = ShopSerializer
-    permission_classes = [AllowAny]
+   
 
 # ৩. Recent Search API
 class RecentSearchView(generics.ListAPIView):
@@ -67,6 +67,8 @@ class FrequentSearchView(views.APIView):
 
 # ৫. মূল Search এবং Filter API
 class ShopFilterView(generics.ListAPIView):
+    
+    permission_classes = [AllowAny]
     """
     এই একটি মাত্র এপিআই সব ধরনের ফিল্টার এবং সর্টিং সমর্থন করে।
     যেমন: পিক-আপ, ডেলিভারি, অফার, দাম, রেটিং এবং সর্টিং।

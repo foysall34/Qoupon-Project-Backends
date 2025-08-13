@@ -2,19 +2,30 @@
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import OrderingFilter
 from django.db.models import Q, Sum
+from rest_framework.response import Response
 from rest_framework import generics, views, response, status
 from rest_framework.permissions import IsAuthenticated, AllowAny
+from django_filters.rest_framework import DjangoFilterBackend, FilterSet, CharFilter
 from .models import Category, Shop, SearchQuery
 from .serializers import (
     CategorySerializer, 
     ShopSerializer, 
     RecentSearchSerializer, 
-    FrequentSearchSerializer
+    FrequentSearchSerializer,
+  
 )
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
+from django.shortcuts import get_object_or_404
+from django.db import transaction # অ্যাটমিক অপারেশনের জন্য
+from .models import Shop, BusinessHours
+from .serializers import BusinessHoursSerializer
+
+
 
 # ১. Category List API
 class CategoryListView(generics.ListAPIView):
-    
     queryset = Category.objects.all()
     serializer_class = CategorySerializer
     permission_classes = [AllowAny]
@@ -63,32 +74,130 @@ class FrequentSearchView(views.APIView):
         ).order_by('-total_searches')[:10] # সেরা ১০টি দেখানো হচ্ছে
         
         serializer = FrequentSearchSerializer(frequent_queries, many=True)
+       
+       
         return response.Response(serializer.data, status=status.HTTP_200_OK)
 
+
+
+
 # ৫. মূল Search এবং Filter API
+class ShopFilter(FilterSet):
+        # শপের নামের জন্য ফিল্টার: 'istartswith' ব্যবহার করা হয়েছে
+    name = CharFilter(field_name='name', lookup_expr='istartswith')
+    
+    # ক্যাটাগরির নামের জন্য ফিল্টার: এখানেও 'istartswith' ব্যবহার করা হয়েছে
+    category_name = CharFilter(field_name='category__name', lookup_expr='istartswith')
+
+    class Meta:
+        model = Shop
+        # বাকি ফিল্টারগুলো এখানে লিস্ট করুন
+        fields = {
+      
+            'category': ['exact'],
+            'allows_pickup': ['exact'],
+            'is_premium':['exact'],
+            'has_offers': ['exact'],
+            'price_range': ['exact', 'in'],
+            'is_beyond_neighborhood': ['exact'],
+            'rating': ['gte'],
+        }
+
+
 class ShopFilterView(generics.ListAPIView):
     
     permission_classes = [AllowAny]
-    """
-    এই একটি মাত্র এপিআই সব ধরনের ফিল্টার এবং সর্টিং সমর্থন করে।
-    যেমন: পিক-আপ, ডেলিভারি, অফার, দাম, রেটিং এবং সর্টিং।
-    """
     queryset = Shop.objects.all()
     serializer_class = ShopSerializer
     
-    # ফিল্টারিং এবং সর্টিংয়ের জন্য Backend যোগ করা হলো
     filter_backends = [DjangoFilterBackend, OrderingFilter]
     
-    # কোন কোন ফিল্ডের উপর ভিত্তি করে ফিল্টার করা যাবে তা নির্ধারণ করা
-    filterset_fields = {
-        'category': ['exact'],
-        'allows_pickup': ['exact'],
-        'is_premium':['exact'],
-        'has_offers': ['exact'],
-        'price_range': ['exact', 'in'], # 'in' দিয়ে একাধিক রেঞ্জও পাঠানো যাবে
-        'is_beyond_neighborhood': ['exact'],
-        'rating': ['gte'], # gte = greater than or equal (এর চেয়ে বেশি বা সমান)
-    }
+    # filterset_fields এর পরিবর্তে filterset_class ব্যবহার করুন
+    filterset_class = ShopFilter
     
-    # কোন কোন ফিল্ডের উপর ভিত্তি করে সর্ট করা যাবে
     ordering_fields = ['rating', 'delivery_time_minutes', 'delivery_fee']
+
+
+    def list(self, request, *args, **kwargs):
+        # প্রথমে ডিফল্ট ফিল্টারিং চালিয়ে কোয়েরিসেটটি নিন
+        queryset = self.filter_queryset(self.get_queryset())
+
+        # শর্ত পরীক্ষা করুন: ব্যবহারকারী কি category_name দিয়ে সার্চ করেছে এবং ফলাফল কি খালি?
+        if 'category_name' in request.query_params and not queryset.exists():
+            # যদি শর্ত পূরণ হয়, তাহলে কাস্টম রেসপন্স রিটার্ন করুন
+            return Response(
+                {"detail": "Sorry,,This Category not found"}, 
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # যদি উপরের শর্ত পূরণ না হয়, তাহলে স্বাভাবিক কার্যক্রম চালান
+        # (যেমন: পেজিনেশন করা এবং ডেটা সিরিয়ালাইজ করা)
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
+    
+
+
+class BusinessHoursView(APIView):
+    # এখানে পারমিশন ক্লাস যোগ করতে পারেন, যেমন IsAuthenticated
+    # permission_classes = [IsAuthenticated]
+
+    def get(self, request, shop_id):
+        """ একটি শপের বর্তমান সময়সূচি রিটার্ন করে। """
+        shop = get_object_or_404(Shop, id=shop_id)
+        
+        # সপ্তাহের সব দিনের জন্য ডেটা তৈরি করুন, এমনকি যদি সেট করা না থাকে
+        all_hours = []
+        days_of_week = [0, 1, 2, 3, 4, 5, 6] # Mon to Sun
+        
+        # ডেটাবেস থেকে vorhandene সময়সূচি আনুন
+        existing_hours = {bh.day: bh for bh in shop.business_hours.all()}
+        
+        for day in days_of_week:
+            if day in existing_hours:
+                serializer = BusinessHoursSerializer(existing_hours[day])
+                all_hours.append(serializer.data)
+            else:
+                # যদি ডেটা সেট করা না থাকে, তাহলে ডিফল্ট মান দিন
+                all_hours.append({
+                    "day": day,
+                    "open_time": None,
+                    "close_time": None,
+                    "is_closed": True # ডিফল্টভাবে বন্ধ
+                })
+                
+        return Response(all_hours, status=status.HTTP_200_OK)
+
+    def post(self, request, shop_id):
+        """ একটি শপের জন্য সপ্তাহের সাত দিনের সময়সূচি সেভ/আপডেট করে। """
+        shop = get_object_or_404(Shop, id=shop_id)
+        hours_data = request.data
+        
+        # নিশ্চিত করুন যে ডেটা একটি লিস্ট
+        if not isinstance(hours_data, list):
+            return Response({"error": "Request data must be a list of business hours."}, status=status.HTTP_400_BAD_REQUEST)
+
+        serializer = BusinessHoursSerializer(data=hours_data, many=True)
+        if serializer.is_valid():
+            try:
+                with transaction.atomic():
+                    # লুপ করে প্রতিটি দিনের জন্য ডেটা সেভ বা আপডেট করুন
+                    for item in serializer.validated_data:
+                        BusinessHours.objects.update_or_create(
+                            shop=shop,
+                            day=item['day'],
+                            defaults={
+                                'open_time': item['open_time'],
+                                'close_time': item['close_time'],
+                                'is_closed': item['is_closed']
+                            }
+                        )
+                return Response({"message": "Business hours updated successfully."}, status=status.HTTP_200_OK)
+            except Exception as e:
+                return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        else:
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

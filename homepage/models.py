@@ -28,7 +28,10 @@ class Shop(models.Model):
     is_premium = models.BooleanField(default=False)
     allows_pickup = models.BooleanField(default=False)
     has_offers = models.BooleanField(default=False)
-
+    shop_title = models.CharField(max_length=100 , null= True , blank=True)
+  
+    
+  
     PRICE_CHOICES = (
         (1, 'start'),
         (2, 'medium'),
@@ -39,11 +42,70 @@ class Shop(models.Model):
     def __str__(self):
         return self.name
 
+
+
+# Vendor site 
+class BusinessHours(models.Model):
+    class DayOfWeek(models.IntegerChoices):
+        MONDAY = 0, 'Monday'
+        TUESDAY = 1, 'Tuesday'
+        WEDNESDAY = 2, 'Wednesday'
+        THURSDAY = 3, 'Thursday'
+        FRIDAY = 4, 'Friday'
+        SATURDAY = 5, 'Saturday'
+        SUNDAY = 6, 'Sunday'
+
+    shop = models.ForeignKey(Shop, on_delete=models.CASCADE, related_name='business_hours')
+    day = models.IntegerField(choices=DayOfWeek.choices)
+    open_time = models.TimeField(null=True, blank=True)
+    close_time = models.TimeField(null=True, blank=True)
+    
+
+    is_closed = models.BooleanField(default=False, help_text="এই দিনে কি শপটি পুরোপুরি বন্ধ থাকবে?")
+
+    class Meta:
+        unique_together = ('shop', 'day')
+
+    def __str__(self):
+        return f"{self.shop.name} - {self.get_day_display()}"
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 class SearchQuery(models.Model):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, null=True, blank=True)
     query_text = models.CharField(max_length=255)
     search_count = models.PositiveIntegerField(default=1)
     created_at = models.DateTimeField(auto_now_add=True)
+
     
     class Meta:
         ordering = ['-created_at']

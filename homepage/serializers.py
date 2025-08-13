@@ -1,7 +1,8 @@
 
 
 from rest_framework import serializers
-from .models import Category, Shop, SearchQuery
+from .models import Category, Shop, SearchQuery , BusinessHours
+from django.utils import timezone
 
 class CategorySerializer(serializers.ModelSerializer):
   
@@ -26,9 +27,11 @@ class ShopSerializer(serializers.ModelSerializer):
   
     category_name = serializers.CharField(source='category.name', read_only=True)
     
-    # এই দুটি ফিল্ডের ভ্যালু নিচের কাস্টম মেথড থেকে আসবে
-    logo_url = serializers.SerializerMethodField()
+
+    shop_logo_url = serializers.SerializerMethodField()
     cover_image_url = serializers.SerializerMethodField()
+    status_text = serializers.SerializerMethodField()
+
     
     class Meta:
         model = Shop
@@ -38,7 +41,8 @@ class ShopSerializer(serializers.ModelSerializer):
             'category',
             'category_name',
             'description',
-            'logo_url',          
+            'shop_title',
+            'shop_logo_url',          
             'cover_image_url',   
             'rating',
             'delivery_fee',
@@ -50,7 +54,9 @@ class ShopSerializer(serializers.ModelSerializer):
             'price_range',
             'logo',              # only for use write 
             'cover_image',  
-             'is_premium'      # Only for use write
+            'is_premium',
+            'status_text',
+                                # Only for use write
         ]
         extra_kwargs = {
             
@@ -59,9 +65,7 @@ class ShopSerializer(serializers.ModelSerializer):
             'category': {'write_only': True}
         }
 
-    def get_logo_url(self, obj):
-   
-        # যদি অবজেক্টের সাথে logo যুক্ত থাকে
+    def get_shop_logo_url(self, obj):
         if obj.logo:
             # return url from cloudinary 
             return obj.logo.url
@@ -72,8 +76,39 @@ class ShopSerializer(serializers.ModelSerializer):
         if obj.cover_image:
             return obj.cover_image.url     
         return None
+    
+    def get_status_text(self, obj):
+        now = timezone.now()
+        current_day = now.weekday()
+        current_time = now.time()
+
+        try:
+            today_hours = obj.business_hours.get(day=current_day)
+        except BusinessHours.DoesNotExist:
+            return "Closed"
+
+        if today_hours.is_closed:
+            return "Closed"
+        
+        # open_time এবং close_time null নয় তা নিশ্চিত করুন
+        if not today_hours.open_time or not today_hours.close_time:
+            return "Not available"
+
+        if today_hours.open_time <= current_time < today_hours.close_time:
+            if obj.delivery_time_minutes:
+                return f"{obj.delivery_time_minutes} min"
+            return "Open"
+        elif current_time < today_hours.open_time:
+            return f"Opens at {today_hours.open_time.strftime('%I:%M %p').lstrip('0')}"
+        else:
+            return "Closed" 
 
 
+class BusinessHoursSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = BusinessHours
+        # shop ফিল্ডটি আমরা URL থেকে নেব, তাই এখানে রাখছি না
+        fields = ['day', 'open_time', 'close_time', 'is_closed']
 
 
 class RecentSearchSerializer(serializers.ModelSerializer):

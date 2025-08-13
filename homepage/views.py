@@ -83,6 +83,7 @@ class ShopFilterView(generics.ListAPIView):
     filterset_fields = {
         'category': ['exact'],
         'allows_pickup': ['exact'],
+        'is_premium':['exact'],
         'has_offers': ['exact'],
         'price_range': ['exact', 'in'], # 'in' দিয়ে একাধিক রেঞ্জও পাঠানো যাবে
         'is_beyond_neighborhood': ['exact'],

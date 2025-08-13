@@ -25,12 +25,8 @@ class Shop(models.Model):
     delivery_time_minutes = models.PositiveIntegerField(default=30)
     distance_miles = models.DecimalField(max_digits=5, decimal_places=1, default=1.0)
     is_beyond_neighborhood = models.BooleanField(default=False)
-
-
-
+    is_premium = models.BooleanField(default=False)
     allows_pickup = models.BooleanField(default=False)
-    
-    # শপে কোনো অফার আছে কি না তার জন্য
     has_offers = models.BooleanField(default=False)
 
     PRICE_CHOICES = (

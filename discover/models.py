@@ -1,6 +1,6 @@
 from django.db import models
 from cloudinary.models import CloudinaryField
-
+from django.conf import settings
 
 
 
@@ -37,3 +37,22 @@ class Restaurant(models.Model):
     def __str__(self):
         return self.name
     
+class Offer(models.Model):
+    # Offer এর মৌলিক তথ্য
+    title = models.CharField(max_length=255)
+    description = models.TextField()
+    image = CloudinaryField('image')
+    valid_until = models.DateTimeField()
+    discount_percentage = models.IntegerField()
+    
+    # অফারের শর্তাবলী
+    redemption_methods = models.CharField(max_length=100, help_text="e.g., Delivery & Pickup")
+    delivery_cost = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
+    min_order_amount = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True)
+    
+    # সম্পর্কযুক্ত মডেল
+    restaurant = models.ForeignKey('Restaurant', on_delete=models.CASCADE, related_name='offers')
+    favorited_by = models.ManyToManyField(settings.AUTH_USER_MODEL , related_name='favorite_offers', blank=True)
+
+    def __str__(self):
+        return self.title

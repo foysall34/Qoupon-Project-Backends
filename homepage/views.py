@@ -56,7 +56,6 @@ class RecentSearchView(generics.ListAPIView):
                 unique_recent_searches.append(search)
                 seen_queries.add(search.query_text)
 
-            # যদি ১০টি ইউনিক সার্চ পাওয়া যায়, তবে লুপ বন্ধ করে দিন
             if len(unique_recent_searches) >= 10:
                 break
         
@@ -71,7 +70,7 @@ class FrequentSearchView(views.APIView):
         # একই query_text গ্রুপ করে search_count যোগ করা হচ্ছে
         frequent_queries = SearchQuery.objects.values('query_text').annotate(
             total_searches=Sum('search_count')
-        ).order_by('-total_searches')[:10] # সেরা ১০টি দেখানো হচ্ছে
+        ).order_by('-total_searches')[:10] 
         
         serializer = FrequentSearchSerializer(frequent_queries, many=True)
        

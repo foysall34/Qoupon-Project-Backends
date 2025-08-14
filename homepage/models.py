@@ -2,6 +2,10 @@
 from django.db import models
 from django.conf import settings
 from cloudinary.models import CloudinaryField
+from geopy.geocoders import Nominatim
+from geopy.exc import GeocoderTimedOut, GeocoderUnavailable
+
+
 
 class Category(models.Model):
     name = models.CharField(max_length=100, unique=True)
@@ -15,9 +19,9 @@ class Shop(models.Model):
     category = models.ForeignKey(Category, related_name='shops', on_delete=models.SET_NULL, null=True)
     description = models.TextField(blank=True, null=True)
     
-    # "Shops Near You" সেকশনের ছোট লোগোর জন্য
+    # "Shops Near You" 
     logo = CloudinaryField('logo', blank=True, null=True)
-    # "Beyond Your Neighborhood" সেকশনের বড় ছবির জন্য
+    # "Beyond Your Neighborhood" 
     cover_image = CloudinaryField('cover_image', blank=True, null=True)
     
     rating = models.DecimalField(max_digits=3, decimal_places=1, default=0.0)
@@ -27,8 +31,32 @@ class Shop(models.Model):
     is_beyond_neighborhood = models.BooleanField(default=False)
     is_premium = models.BooleanField(default=False)
     allows_pickup = models.BooleanField(default=False)
+    allows_delivery = models.BooleanField(default=True, help_text="support delivery or not")
     has_offers = models.BooleanField(default=False)
     shop_title = models.CharField(max_length=100 , null= True , blank=True)
+    shop_address = models.CharField(
+        max_length=255, null=True, blank=True, help_text="give address"
+    )
+    latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+    longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+
+
+
+    def save(self, *args, **kwargs):      
+        if self.shop_address:
+            geolocator = Nominatim(user_agent="qoupon_app_v1") 
+            try:
+                # fetch location from address 
+                location = geolocator.geocode(self.shop_address, timeout=10)
+                if location:
+                    self.latitude = location.latitude
+                    self.longitude = location.longitude
+                
+            except (GeocoderTimedOut, GeocoderUnavailable) as e:
+                print(f"Error: Geocoding service timed out for address '{self.shop_address}'. Error: {e}")
+            except Exception as e:
+                print(f"An unexpected error occurred during geocoding: {e}")
+        super().save(*args, **kwargs)
   
     
   

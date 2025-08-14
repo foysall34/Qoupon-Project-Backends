@@ -1,5 +1,3 @@
-
-
 from rest_framework import serializers
 from .models import Category, Shop, SearchQuery , BusinessHours
 from django.utils import timezone
@@ -17,21 +15,16 @@ class CategorySerializer(serializers.ModelSerializer):
 
     # fucntion of make url 
     def get_image_url(self, obj):
-        
         if obj.image:
-           
             return obj.image.url
         return None 
 
 class ShopSerializer(serializers.ModelSerializer):
-  
     category_name = serializers.CharField(source='category.name', read_only=True)
-    
-
     shop_logo_url = serializers.SerializerMethodField()
     cover_image_url = serializers.SerializerMethodField()
     status_text = serializers.SerializerMethodField()
-
+    
     
     class Meta:
         model = Shop
@@ -42,7 +35,7 @@ class ShopSerializer(serializers.ModelSerializer):
             'category_name',
             'description',
             'shop_title',
-            'shop_logo_url',          
+            'shop_logo_url',        
             'cover_image_url',   
             'rating',
             'delivery_fee',
@@ -56,6 +49,9 @@ class ShopSerializer(serializers.ModelSerializer):
             'cover_image',  
             'is_premium',
             'status_text',
+            'shop_address', 
+            'latitude',
+            'longitude' 
                                 # Only for use write
         ]
         extra_kwargs = {
@@ -65,6 +61,8 @@ class ShopSerializer(serializers.ModelSerializer):
             'category': {'write_only': True}
         }
 
+
+   
     def get_shop_logo_url(self, obj):
         if obj.logo:
             # return url from cloudinary 
@@ -99,7 +97,7 @@ class ShopSerializer(serializers.ModelSerializer):
                 return f"{obj.delivery_time_minutes} min"
             return "Open"
         elif current_time < today_hours.open_time:
-            return f"Opens at {today_hours.open_time.strftime('%I:%M %p').lstrip('0')}"
+            return f"Open {today_hours.open_time.strftime('%I:%M %p').lstrip('0')}"
         else:
             return "Closed" 
 

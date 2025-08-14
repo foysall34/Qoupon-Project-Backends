@@ -39,10 +39,13 @@ INSTALLED_APPS = [
     'accounts',
     'food',
     'homepage',
+    'discover',
     # 3rd party
     'rest_framework',
     'cloudinary_storage', 
     'cloudinary',  
+    'django_filters', 
+      
     
 ]
 
@@ -167,6 +170,9 @@ REST_FRAMEWORK = {
       'DEFAULT_PERMISSION_CLASSES': (
         'rest_framework.permissions.IsAuthenticated',
     ),
+   'DEFAULT_FILTER_BACKENDS': [
+        'django_filters.rest_framework.DjangoFilterBackend'
+    ],
 }
 
 

@@ -157,8 +157,6 @@ def place_detail(request, pk):
 @permission_classes([IsAuthenticated])
 def user_profile_view(request):
    
-    # get_or_create: যদি প্রোফাইল থাকে তাহলে সেটি আনবে, না থাকলে নতুন তৈরি করবে।
-    # created ভেরিয়েবলটি বলে দেবে প্রোফাইলটি নতুন তৈরি হলো কিনা (True/False)।
     profile, created = Profile.objects.get_or_create(user=request.user)
 
     if request.method == 'GET':

@@ -111,10 +111,12 @@ class ProfileSerializer(serializers.ModelSerializer):
             'full_name',
             'phone_number',
             'language',
-            'profile_picture',       # Used for uploads (write-only)
-            'profile_picture_url'    # Used for display (read-only)
+            'profile_picture',# Used for uploads (write-only)
+            'profile_picture_url',
+            'country' ,
+            'city',
+            'address'  # Used for display (read-only)
         ]
-        # This ensures the raw 'profile_picture' path isn't in the output.
         extra_kwargs = {
             'profile_picture': {'write_only': True}
         }
@@ -125,8 +127,6 @@ class ProfileSerializer(serializers.ModelSerializer):
         'obj' is the Profile instance.
         """
         if obj.profile_picture:
-            # The .url attribute of a CloudinaryField automatically
-            # generates the full URL.
             return obj.profile_picture.url
-        return None # Or return a default image URL
+        return None 
         

@@ -66,3 +66,6 @@ class CoffeeSubscriptionOffer(models.Model):
     def is_expired(self):
         """মেয়াদ শেষ হয়েছে কিনা তা পরীক্ষা করে"""
         return timezone.now() > self.expiry_date
+    
+# Edit profile 
+

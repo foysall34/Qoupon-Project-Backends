@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from .models import Restaurant , Offer
-from .models import Restaurant, Cuisine, Diet
+from .models import Restaurant, Cuisine, Diet , CoffeeSubscriptionOffer
 
 
 
@@ -54,9 +54,22 @@ class RestaurantSerializer(serializers.ModelSerializer):
 
 
 class NestedRestaurantSerializer(serializers.ModelSerializer):
+    logo_url = serializers.SerializerMethodField()
+
     class Meta:
         model = Restaurant
-        fields = ['name', 'logo']
+        fields = ['name', 'logo' ,'logo_url']
+        extra_kwargs = {
+            
+            'logo': {'write_only': True},
+        }
+
+    def get_logo_url(self, obj):
+        if obj.logo:
+            return obj.logo.url
+        return None
+
+        
 
 
 class OfferSerializer(serializers.ModelSerializer):
@@ -65,6 +78,7 @@ class OfferSerializer(serializers.ModelSerializer):
     
     # বর্তমান ইউজার অফারটি ফেভারিট করেছে কিনা তা দেখানোর জন্য
     is_favorited = serializers.SerializerMethodField()
+    offer_image = serializers.SerializerMethodField()
     
     class Meta:
         model = Offer
@@ -79,14 +93,33 @@ class OfferSerializer(serializers.ModelSerializer):
             'delivery_cost',
             'min_order_amount',
             'restaurant',
-            'is_favorited' # নতুন ফিল্ড
+            'is_favorited',
+            'offer_image'
         ]
+        extra_kwargs = {
+            
+            'image': {'write_only': True},
+         }
+
+
+    def get_offer_image(self, obj):
+        if obj.image:
+            return obj.image.url
+        return None
+
+
 
     def get_is_favorited(self, obj):
-        # রিকোয়েস্ট থেকে ইউজারকে নিই
         user = self.context['request'].user
-        # যদি ইউজার লগইন করা না থাকে, তাহলে False পাঠাই
+   
         if not user.is_authenticated:
             return False
-        # চেক করি ইউজার 'favorited_by' লিস্টে আছে কিনা
         return obj.favorited_by.filter(pk=user.pk).exists()
+    
+
+
+class CoffeeSubscriptionOfferSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CoffeeSubscriptionOffer
+        # কোন কোন ফিল্ড API তে দেখানো হবে
+        fields = ['title', 'description', 'price_details', 'offer_details', 'website_url']

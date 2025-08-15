@@ -10,6 +10,8 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
+from .models import CoffeeSubscriptionOffer
+from .serializers import CoffeeSubscriptionOfferSerializer
 
 
 class RestaurantListView(ListAPIView):
@@ -66,4 +68,29 @@ class FavoriteOffersListView(ListAPIView):
         return self.request.user.favorite_offers.all()
 
     
-    # ফিল্টার ক্লাস যুক্ত করুন
+
+# For QR code views.py 
+
+
+
+
+class PretCoffeeSubscriptionAPIView(APIView):
+    permission_classes = [AllowAny]
+    def get(self, request, *args, **kwargs):
+        try:
+            offer = CoffeeSubscriptionOffer.objects.get(is_active=True)
+            if offer.is_expired():
+                error_message = {
+               
+                    "details": "Sorry, this offer has expired."
+                }
+                return Response(error_message, status=status.HTTP_410_GONE)
+            serializer = CoffeeSubscriptionOfferSerializer(offer)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+
+        except CoffeeSubscriptionOffer.DoesNotExist:
+            error_message = {
+          
+                "details": "No active offer found."
+            }
+            return Response(error_message, status=status.HTTP_404_NOT_FOUND)

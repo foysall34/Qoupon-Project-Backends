@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Restaurant , Offer
+from .models import Restaurant , Offer , Order
 from .models import Restaurant, Cuisine, Diet , CoffeeSubscriptionOffer
 
 
@@ -36,8 +36,8 @@ class RestaurantSerializer(serializers.ModelSerializer):
             'tags',
             'discount_percentage',
             'logo_url',
-            'cuisines', # নতুন ফিল্ড
-            'diets',    # নতুন ফিল্ড
+            'cuisines', 
+            'diets',    
             'average_price',
         ]
       
@@ -73,10 +73,9 @@ class NestedRestaurantSerializer(serializers.ModelSerializer):
 
 
 class OfferSerializer(serializers.ModelSerializer):
-    # সম্পর্কযুক্ত রেস্টুরেন্টের তথ্য দেখানোর জন্য
     restaurant = NestedRestaurantSerializer(read_only=True)
     
-    # বর্তমান ইউজার অফারটি ফেভারিট করেছে কিনা তা দেখানোর জন্য
+  
     is_favorited = serializers.SerializerMethodField()
     offer_image = serializers.SerializerMethodField()
     
@@ -121,5 +120,31 @@ class OfferSerializer(serializers.ModelSerializer):
 class CoffeeSubscriptionOfferSerializer(serializers.ModelSerializer):
     class Meta:
         model = CoffeeSubscriptionOffer
-        # কোন কোন ফিল্ড API তে দেখানো হবে
         fields = ['title', 'description', 'price_details', 'offer_details', 'website_url']
+
+
+
+class OrderSerializer(serializers.ModelSerializer):
+    product_image_url = serializers.SerializerMethodField()
+    class Meta:
+        model = Order
+        fields = [
+            'id',
+            'order_id',
+            'product_name',
+            'product_image',
+            'price',
+            'status',
+            'order_type',
+            'created_at',
+            'product_image_url'
+        ]
+        extra_kwargs = {
+            
+            'product_image': {'write_only': True},
+         }
+
+    def get_product_image_url(self, obj):
+        if obj.product_image:
+            return obj.product_image.url
+        return None

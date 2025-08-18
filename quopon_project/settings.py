@@ -56,7 +56,9 @@ load_dotenv(os.path.join(BASE_DIR, ".env"))
 cloudinary.config( 
   cloud_name = config("CLOUD_NAME"), 
   api_key = config("CLOUD_API_KEY"), 
-  api_secret = config("CLOUD_API_SECRET") 
+  api_secret = config("CLOUD_API_SECRET"),
+  secure = config("SECURE") 
+  
 )
 # ডিফল্ট ফাইল স্টোরেজ হিসেবে Cloudinary সেট করা হচ্ছে
 DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'

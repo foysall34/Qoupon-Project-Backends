@@ -1,9 +1,9 @@
 from rest_framework.generics import ListAPIView
 from .models import Restaurant
-from .serializers import RestaurantSerializer, OfferSerializer 
+from .serializers import RestaurantSerializer, OfferSerializer  , OrderSerializer
 from rest_framework.permissions import AllowAny 
 from django_filters import rest_framework as filters
-from .models import Restaurant, Cuisine, Diet, Offer
+from .models import Restaurant, Cuisine, Diet, Offer , Order
 from .filters import RestaurantFilter 
 from rest_framework.generics import RetrieveAPIView, ListAPIView
 from rest_framework.views import APIView
@@ -70,10 +70,6 @@ class FavoriteOffersListView(ListAPIView):
     
 
 # For QR code views.py 
-
-
-
-
 class PretCoffeeSubscriptionAPIView(APIView):
     permission_classes = [AllowAny]
     def get(self, request, *args, **kwargs):
@@ -94,3 +90,21 @@ class PretCoffeeSubscriptionAPIView(APIView):
                 "details": "No active offer found."
             }
             return Response(error_message, status=status.HTTP_404_NOT_FOUND)
+        
+class OrderListView(ListAPIView):
+    serializer_class = OrderSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        """
+        এই ভিউটি শুধুমাত্র অথেনটিকেটেড ব্যবহারকারীর অর্ডারগুলো দেখাবে
+        এবং 'status' কোয়েরি প্যারামিটার অনুযায়ী ফিল্টার করবে।
+        """
+        user = self.request.user
+        queryset = Order.objects.filter(user=user).order_by('-created_at') # নতুন অর্ডার আগে দেখাবে
+
+        status = self.request.query_params.get('status', None)
+        if status is not None and status in ['active', 'completed', 'cancelled']:
+            queryset = queryset.filter(status=status)
+            
+        return queryset

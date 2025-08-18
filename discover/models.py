@@ -20,7 +20,7 @@ class Restaurant(models.Model):
     name = models.CharField(max_length=255)
     logo = CloudinaryField('image', blank=True, null=True)
     rating = models.DecimalField(max_digits=3, decimal_places=1)
-    review_count = models.IntegerField(max_length=20)
+    review_count = models.IntegerField()
     distance_km = models.DecimalField(max_digits=4, decimal_places=1)
     tags = models.CharField(max_length=255, help_text="Comma-separated tags e.g., Vegan, Gezond, Pizza")
     discount_percentage = models.IntegerField(default=0)
@@ -56,15 +56,48 @@ class CoffeeSubscriptionOffer(models.Model):
     price_details = models.CharField(max_length=100, default="for £20 a month")
     offer_details = models.CharField(max_length=100, default="and your first month FREE")
     website_url = models.URLField(default="http://PretCoffeeSub.co.uk")
-    is_active = models.BooleanField(default=True) # অফারটি সক্রিয় কিনা তা ট্র্যাক করার জন্য
-    expiry_date = models.DateTimeField() # অফারের মেয়াদ শেষ হওয়ার তারিখ ও সময়
+    is_active = models.BooleanField(default=True) 
+    expiry_date = models.DateTimeField()
 
     def __str__(self):
         return self.title
 
     def is_expired(self):
-        """মেয়াদ শেষ হয়েছে কিনা তা পরীক্ষা করে"""
         return timezone.now() > self.expiry_date
     
-# Edit profile 
 
+
+
+
+# প্রতিটি অর্ডারের স্ট্যাটাস নির্ধারণ করার জন্য
+class OrderStatus(models.TextChoices):
+    ACTIVE = 'active', 'Active'
+    COMPLETED = 'completed', 'Completed'
+    CANCELLED = 'cancelled', 'Cancelled'
+
+# অর্ডারের ধরন নির্ধারণ করার জন্য
+class OrderType(models.TextChoices):
+    DELIVERY = 'delivery', 'Delivery'
+    PICKUP = 'pickup', 'Pickup'
+
+class Order(models.Model):
+    user = models.ForeignKey(settings.AUTH_USER_MODEL , on_delete=models.CASCADE, related_name='orders')
+    order_id = models.CharField(max_length=100, unique=True)
+    product_name = models.CharField(max_length=255)
+    # এখানে ImageField ব্যবহার করা যেতে পারে, তবে উদাহরণের জন্য URLField সহজ
+    product_image = CloudinaryField('image')
+    price = models.DecimalField(max_digits=10, decimal_places=2)
+    status = models.CharField(
+        max_length=20,
+        choices=OrderStatus.choices,
+        default=OrderStatus.ACTIVE
+    )
+    order_type = models.CharField(
+        max_length=20,
+        choices=OrderType.choices,
+        default=OrderType.DELIVERY
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.order_id} - {self.product_name}"

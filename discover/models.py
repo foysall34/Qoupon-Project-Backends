@@ -70,13 +70,12 @@ class CoffeeSubscriptionOffer(models.Model):
 
 
 
-# প্রতিটি অর্ডারের স্ট্যাটাস নির্ধারণ করার জন্য
 class OrderStatus(models.TextChoices):
     ACTIVE = 'active', 'Active'
     COMPLETED = 'completed', 'Completed'
     CANCELLED = 'cancelled', 'Cancelled'
 
-# অর্ডারের ধরন নির্ধারণ করার জন্য
+
 class OrderType(models.TextChoices):
     DELIVERY = 'delivery', 'Delivery'
     PICKUP = 'pickup', 'Pickup'
@@ -85,7 +84,6 @@ class Order(models.Model):
     user = models.ForeignKey(settings.AUTH_USER_MODEL , on_delete=models.CASCADE, related_name='orders')
     order_id = models.CharField(max_length=100, unique=True)
     product_name = models.CharField(max_length=255)
-    # এখানে ImageField ব্যবহার করা যেতে পারে, তবে উদাহরণের জন্য URLField সহজ
     product_image = CloudinaryField('image')
     price = models.DecimalField(max_digits=10, decimal_places=2)
     status = models.CharField(
@@ -119,9 +117,7 @@ class VendorFollowed(models.Model):
         return self.category
 
 
-
-
-
+# payment ***************************************************************************************************
 class MenuCategory(models.Model):
     name = models.CharField(max_length=100, unique=True)
     order = models.PositiveIntegerField(default=0)
@@ -153,3 +149,44 @@ class MenuItem(models.Model):
 
 
 
+class Customization(models.Model):
+    # যেমন: "Select Cheese", "Select Spreads"
+    name = models.CharField(max_length=100)
+    
+    def __str__(self):
+        return self.name
+    
+class CustomizationOption(models.Model):
+    customization = models.ForeignKey(Customization, on_delete=models.CASCADE, related_name='options')
+    # যেমন: "Cheddar", "Mayo", "Ranch"
+    name = models.CharField(max_length=100)
+    # কিছু অপশনের জন্য অতিরিক্ত মূল্য থাকতে পারে
+    additional_price = models.DecimalField(max_digits=6, decimal_places=2, default=0.00)
+
+    def __str__(self):
+        return f"{self.customization.name} - {self.name}"
+    
+
+
+class Cart(models.Model):
+    class DeliveryType(models.TextChoices):
+        DELIVERY = 'delivery', 'Delivery'
+        PICKUP = 'pickup', 'Pickup'
+
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='cart')
+    delivery_type = models.CharField(max_length=10, choices=DeliveryType.choices, default=DeliveryType.PICKUP)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"Cart for {self.user.email}"
+    
+class CartItem(models.Model):
+    cart = models.ForeignKey(Cart, on_delete=models.CASCADE, related_name='items')
+    menu_item = models.ForeignKey(MenuItem, on_delete=models.CASCADE)
+    quantity = models.PositiveIntegerField(default=1)
+    # এই আইটেমের জন্য নির্বাচিত কাস্টমাইজেশন
+    selected_options = models.ManyToManyField(CustomizationOption, blank=True)
+
+    def __str__(self):
+        return f"{self.quantity} x {self.menu_item.name} in cart {self.cart.id}"

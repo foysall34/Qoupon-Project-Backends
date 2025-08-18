@@ -1,7 +1,7 @@
 from rest_framework import serializers 
 from .models import Restaurant , Offer , Order , VendorFollowed , MenuItem , MenuCategory
-from .models import Restaurant, Cuisine, Diet , CoffeeSubscriptionOffer
-
+from .models import Restaurant, Cuisine, Diet , CoffeeSubscriptionOffer ,CartItem, Cart, CustomizationOption
+from decimal import Decimal
 
 
 
@@ -203,3 +203,60 @@ class MenuCategorySerializer(serializers.ModelSerializer):
     class Meta:
         model = MenuCategory
         fields = ['id', 'name', 'items']
+
+# payment *************************************************************************
+
+
+class MenuItemSerializer2(serializers.ModelSerializer):
+    class Meta:
+        model = MenuItem
+        fields = ['name', 'image']
+
+
+
+class CustomizationOptionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CustomizationOption
+        fields = ['name', 'additional_price']
+
+class CartItemSerializer(serializers.ModelSerializer):
+    menu_item = MenuItemSerializer(read_only=True)
+    selected_options = CustomizationOptionSerializer(many=True, read_only=True)
+    total_price = serializers.SerializerMethodField()
+
+    class Meta:
+        model = CartItem
+        fields = ['id', 'menu_item', 'quantity', 'selected_options', 'total_price']
+    
+    def get_total_price(self, obj):
+        # একটি আইটেমের মোট মূল্য = (বেস মূল্য + কাস্টমাইজেশন মূল্য) * পরিমাণ
+        base_price = obj.menu_item.price
+        options_price = sum(option.additional_price for option in obj.selected_options.all())
+        return (base_price + options_price) * obj.quantity
+
+class CartSerializer(serializers.ModelSerializer):
+    items = CartItemSerializer(many=True, read_only=True)
+    sub_total = serializers.SerializerMethodField()
+    delivery_charges = serializers.SerializerMethodField()
+    total = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Cart
+        fields = ['id', 'user', 'delivery_type', 'items', 'sub_total', 'delivery_charges', 'total']
+    
+    def get_sub_total(self, obj):
+        # সব আইটেমের মোট মূল্য যোগ করে সাব-টোটাল গণনা
+        return sum(
+            (item.menu_item.price + sum(opt.additional_price for opt in item.selected_options.all())) * item.quantity
+            for item in obj.items.all()
+        )
+    
+    def get_delivery_charges(self, obj):
+        if obj.delivery_type == 'delivery' and self.get_sub_total(obj) > 0:
+            # 1.99 (float) এর পরিবর্তে Decimal('1.99') ব্যবহার করুন
+            return Decimal('1.99')
+        # 0.00 (float) এর পরিবর্তে Decimal('0.00') ব্যবহার করুন
+        return Decimal('0.00')
+        
+    def get_total(self, obj):
+        return self.get_sub_total(obj) + self.get_delivery_charges(obj)

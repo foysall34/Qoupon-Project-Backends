@@ -1,9 +1,10 @@
 from rest_framework.generics import ListAPIView
+from django.http import Http404
 from .models import Restaurant
 from .serializers import RestaurantSerializer, OfferSerializer  , OrderSerializer
 from rest_framework.permissions import AllowAny 
 from django_filters import rest_framework as filters
-from .models import Restaurant, Cuisine, Diet, Offer , Order , VendorFollowed , MenuItem, MenuCategory
+from .models import Restaurant, Cuisine, Diet, Offer , Order , VendorFollowed , MenuItem, MenuCategory, CartItem, Cart
 from .filters import RestaurantFilter 
 from rest_framework.generics import RetrieveAPIView, ListAPIView
 from rest_framework.views import APIView
@@ -11,7 +12,7 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from .models import CoffeeSubscriptionOffer
-from .serializers import CoffeeSubscriptionOfferSerializer , FollowedVendorSerializer , MenuCategorySerializer , MenuItemSerializer
+from .serializers import  CartSerializer,CartItemSerializer, CoffeeSubscriptionOfferSerializer , FollowedVendorSerializer , MenuCategorySerializer , MenuItemSerializer
 from django.db.models import Count, Q
 from rest_framework import generics, permissions
 from rest_framework.filters import SearchFilter
@@ -36,15 +37,14 @@ class OfferDetailView(RetrieveAPIView):
     queryset = Offer.objects.all()
     serializer_class = OfferSerializer
     
-    # সিরিয়ালাইজারে request অবজেক্ট পাস করার জন্য
     def get_serializer_context(self):
         context = super().get_serializer_context()
         context['request'] = self.request
         return context
 
-# ফেভারিট যোগ/বাদ দেওয়ার জন্য ভিউ
+
 class FavoriteToggleView(APIView):
-    permission_classes = [IsAuthenticated] # শুধুমাত্র লগইন করা ইউজাররা ব্যবহার করতে পারবে
+    permission_classes = [IsAuthenticated] 
 
     def post(self, request, pk, format=None):
         try:
@@ -53,23 +53,21 @@ class FavoriteToggleView(APIView):
             return Response(status=status.HTTP_404_NOT_FOUND)
         
         user = request.user
-        
-        # যদি ইউজার ইতোমধ্যে ফেভারিট করে থাকে, তাহলে রিমুভ করুন
+
         if offer.favorited_by.filter(pk=user.pk).exists():
             offer.favorited_by.remove(user)
             return Response({"detail": "Removed from favorites."}, status=status.HTTP_200_OK)
-        # না হলে, যোগ করুন
+
         else:
             offer.favorited_by.add(user)
             return Response({"detail": "Added to favorites."}, status=status.HTTP_200_OK)
 
-# ইউজারের সব ফেভারিট অফার দেখানোর জন্য
+
 class FavoriteOffersListView(ListAPIView):
     serializer_class = OfferSerializer
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        # শুধুমাত্র বর্তমান ইউজারের ফেভারিট করা অফারগুলো রিটার্ন করুন
         return self.request.user.favorite_offers.all()
 
     
@@ -101,12 +99,9 @@ class OrderListView(ListAPIView):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        """
-        এই ভিউটি শুধুমাত্র অথেনটিকেটেড ব্যবহারকারীর অর্ডারগুলো দেখাবে
-        এবং 'status' কোয়েরি প্যারামিটার অনুযায়ী ফিল্টার করবে।
-        """
+    
         user = self.request.user
-        queryset = Order.objects.filter(user=user).order_by('-created_at') # নতুন অর্ডার আগে দেখাবে
+        queryset = Order.objects.filter(user=user).order_by('-created_at') 
 
         status = self.request.query_params.get('status', None)
         if status is not None and status in ['active', 'completed', 'cancelled']:
@@ -118,32 +113,131 @@ class OrderListView(ListAPIView):
 
 
 class VendorSearchListView(generics.ListAPIView):
-    """
-    এই ভিউটি ভেন্ডরদের তালিকা দেখাবে এবং 
-    'search' ও 'category' প্যারামিটার দিয়ে খোঁজার সুবিধা দেবে।
-    """
+
     queryset = VendorFollowed.objects.all()
     serializer_class = FollowedVendorSerializer
     
-    # কোন কোন ব্যাকএন্ড ব্যবহার করা হবে তা নির্ধারণ করা
+ 
     filter_backends = [DjangoFilterBackend, SearchFilter]
-    
-    # DjangoFilterBackend-এর জন্য: কোন কোন ফিল্ড দিয়ে ফিল্টার করা যাবে
     filterset_fields = ['category']
-    
-    # SearchFilter-এর জন্য: কোন কোন ফিল্ডে সার্চ করা হবে
     search_fields = ['name']
 
 
 
 class MenuView(generics.ListAPIView):
-    """
-    এই ভিউটি সমস্ত মেনু ক্যাটাগরি এবং তাদের অধীনে থাকা আইটেমগুলোর তালিকা দেখাবে।
-    """
+
     serializer_class = MenuCategorySerializer
 
     def get_queryset(self):
-        """
-        ডেটাবেস পারফরম্যান্স অপটিমাইজ করার জন্য prefetch_related ব্যবহার করা হয়েছে।
-        """
+
         return MenuCategory.objects.prefetch_related('items').all()
+    
+
+# for payment ***************************************************************************************
+class CartDetailAPIView(APIView):
+    """
+    লগইন করা ব্যবহারকারীর কার্টের বিস্তারিত তথ্য দেখায় এবং আপডেট করে (e.g., delivery type)।
+    GET, PUT, PATCH মেথড হ্যান্ডেল করে।
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get_object(self):
+        """
+        সহায়ক মেথড: বর্তমান ব্যবহারকারীর জন্য কার্ট খুঁজে বের করে বা তৈরি করে।
+        """
+        cart, created = Cart.objects.get_or_create(user=self.request.user)
+        return cart
+
+    def get(self, request, *args, **kwargs):
+        """
+        কার্টের বিস্তারিত তথ্য দেখানোর জন্য GET রিকোয়েস্ট।
+        """
+        cart = self.get_object()
+        serializer = CartSerializer(cart, context={'request': request})
+        return Response(serializer.data)
+
+    def patch(self, request, *args, **kwargs):
+        """
+        কার্টের আংশিক তথ্য (যেমন delivery_type) আপডেট করার জন্য PATCH রিকোয়েস্ট।
+        """
+        cart = self.get_object()
+        # 'partial=True' দিয়ে আমরা আংশিক আপডেট করতে পারি
+        serializer = CartSerializer(cart, data=request.data, partial=True, context={'request': request})
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+# CartItemViewSet এর List এবং Create অংশের জন্য
+class CartItemListCreateAPIView(APIView):
+    """
+    ব্যবহারকারীর কার্টে থাকা আইটেমের তালিকা দেখায় (GET) এবং 
+    নতুন আইটেম যোগ করে (POST)।
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, *args, **kwargs):
+        """
+        কার্টে থাকা সব আইটেমের তালিকা দেখানোর জন্য।
+        """
+        cart_items = CartItem.objects.filter(cart__user=request.user)
+        serializer = CartItemSerializer(cart_items, many=True, context={'request': request})
+        return Response(serializer.data)
+
+    def post(self, request, *args, **kwargs):
+        """
+        কার্টে একটি নতুন আইটেম যোগ করার জন্য।
+        """
+        serializer = CartItemSerializer(data=request.data, context={'request': request})
+        if serializer.is_valid():
+            # ব্যবহারকারীর কার্ট খুঁজে বের করে তার সাথে আইটেমটি যুক্ত করে
+            cart, created = Cart.objects.get_or_create(user=request.user)
+            serializer.save(cart=cart)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+# CartItemViewSet এর Retrieve, Update, Delete অংশের জন্য
+class CartItemDetailAPIView(APIView):
+    """
+    একটি নির্দিষ্ট কার্ট আইটেম দেখা (GET), আপডেট করা (PUT/PATCH), 
+    এবং ডিলিট করার (DELETE) জন্য।
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get_object(self, pk):
+        """
+        সহায়ক মেথড: একটি নির্দিষ্ট কার্ট আইটেম খুঁজে বের করে, 
+        এবং নিশ্চিত করে যে এটি বর্তমান ব্যবহারকারীর।
+        """
+        try:
+            return CartItem.objects.get(pk=pk, cart__user=self.request.user)
+        except CartItem.DoesNotExist:
+            raise Http404
+
+    def get(self, request, pk, *args, **kwargs):
+        """
+        একটি নির্দিষ্ট আইটেমের বিস্তারিত তথ্য দেখানোর জন্য।
+        """
+        cart_item = self.get_object(pk)
+        serializer = CartItemSerializer(cart_item, context={'request': request})
+        return Response(serializer.data)
+
+    def patch(self, request, pk, *args, **kwargs):
+        """
+        একটি নির্দিষ্ট আইটেমের পরিমাণ (quantity) আপডেট করার জন্য।
+        """
+        cart_item = self.get_object(pk)
+        serializer = CartItemSerializer(cart_item, data=request.data, partial=True, context={'request': request})
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def delete(self, request, pk, *args, **kwargs):
+        """
+        একটি নির্দিষ্ট আইটেম কার্ট থেকে ডিলিট করার জন্য।
+        """
+        cart_item = self.get_object(pk)
+        cart_item.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)

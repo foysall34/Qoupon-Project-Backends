@@ -1,6 +1,12 @@
 from django.contrib import admin
-from .models import Restaurant, Cuisine , Diet, Offer, CoffeeSubscriptionOffer , Order ,  VendorFollowed , MenuItem, MenuCategory
+from .models import Cart,CustomizationOption,Customization,CartItem,Restaurant, Cuisine , Diet, Offer, CoffeeSubscriptionOffer , Order ,  VendorFollowed , MenuItem, MenuCategory
 
+
+
+admin.site.register(Cart)
+admin.site.register(Customization)
+admin.site.register(CustomizationOption)
+admin.site.register(CartItem)
 admin.site.register(MenuCategory)
 admin.site.register(MenuItem)
 admin.site.register(VendorFollowed)

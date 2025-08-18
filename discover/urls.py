@@ -1,5 +1,5 @@
 from django.urls import path
-from .views import MenuView,VendorSearchListView, OrderListView,RestaurantListView , OfferDetailView , FavoriteOffersListView , FavoriteToggleView , PretCoffeeSubscriptionAPIView
+from .views import  CartItemDetailAPIView,CartItemListCreateAPIView,CartDetailAPIView ,MenuView,VendorSearchListView, OrderListView,RestaurantListView , OfferDetailView , FavoriteOffersListView , FavoriteToggleView , PretCoffeeSubscriptionAPIView
 
 urlpatterns = [
     path('list/', RestaurantListView.as_view(), name='restaurant-list'),
@@ -13,5 +13,13 @@ urlpatterns = [
 
     path('followed-vendors/', VendorSearchListView.as_view(), name='followed-vendor-list'),
     path('menu/', MenuView.as_view(), name='menu-list'),
+        # /api/cart/ - কার্টের বিস্তারিত তথ্যের জন্য
+    path('cart/', CartDetailAPIView.as_view(), name='cart-detail-api'),
+    
+    # /api/cart-items/ - আইটেমের তালিকা দেখা এবং নতুন আইটেম যোগ করা
+    path('cart-items/', CartItemListCreateAPIView.as_view(), name='cart-item-list-create-api'),
+    
+    # /api/cart-items/<pk>/ - একটি নির্দিষ্ট আইটেম দেখা, আপডেট করা বা ডিলিট করা
+    path('cart-items/<int:pk>/', CartItemDetailAPIView.as_view(), name='cart-item-detail-api'),
     
 ]

@@ -2,7 +2,8 @@ from django.db import models
 from cloudinary.models import CloudinaryField
 from django.conf import settings
 from django.utils import timezone
-
+from django.db.models.signals import post_save
+from django.dispatch import receiver
 
 class Cuisine(models.Model):
     name = models.CharField(max_length=100, unique=True)
@@ -101,3 +102,54 @@ class Order(models.Model):
 
     def __str__(self):
         return f"{self.order_id} - {self.product_name}"
+    
+
+
+
+class VendorFollowed(models.Model):
+    title = models.CharField(max_length=200 , default='title' , blank= True, null= True)
+    logo = CloudinaryField('image')
+    category = models.CharField(max_length=100)
+    descriptions = models.CharField(max_length=200)
+    expiry_date = models.DateTimeField(default=timezone.now)
+    is_followed = models.BooleanField(default=False)
+    
+
+    def __str__(self):
+        return self.category
+
+
+
+
+
+class MenuCategory(models.Model):
+    name = models.CharField(max_length=100, unique=True)
+    order = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        ordering = ['order', 'name']
+        verbose_name_plural = "Menu Categories"
+
+    def __str__(self):
+        return self.name
+
+class MenuItem(models.Model):
+    category = models.ForeignKey(
+        MenuCategory, 
+        on_delete=models.CASCADE, 
+        related_name='items'
+    )
+    name = models.CharField(max_length=200)
+    description = models.TextField()
+    price = models.DecimalField(max_digits=6, decimal_places=2)
+    calories = models.PositiveIntegerField()
+    image = CloudinaryField('image')
+
+    class Meta:
+        ordering = ['name']
+
+    def __str__(self):
+        return self.name
+
+
+

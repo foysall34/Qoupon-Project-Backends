@@ -3,7 +3,7 @@ from .models import Restaurant
 from .serializers import RestaurantSerializer, OfferSerializer  , OrderSerializer
 from rest_framework.permissions import AllowAny 
 from django_filters import rest_framework as filters
-from .models import Restaurant, Cuisine, Diet, Offer , Order
+from .models import Restaurant, Cuisine, Diet, Offer , Order , VendorFollowed , MenuItem, MenuCategory
 from .filters import RestaurantFilter 
 from rest_framework.generics import RetrieveAPIView, ListAPIView
 from rest_framework.views import APIView
@@ -11,11 +11,16 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from .models import CoffeeSubscriptionOffer
-from .serializers import CoffeeSubscriptionOfferSerializer
+from .serializers import CoffeeSubscriptionOfferSerializer , FollowedVendorSerializer , MenuCategorySerializer , MenuItemSerializer
+from django.db.models import Count, Q
+from rest_framework import generics, permissions
+from rest_framework.filters import SearchFilter
+from django_filters.rest_framework import DjangoFilterBackend
 
+
+from rest_framework.filters import SearchFilter
 
 class RestaurantListView(ListAPIView):
-    
     permission_classes = [AllowAny]
     """
     API endpoint to list all available restaurants.
@@ -108,3 +113,37 @@ class OrderListView(ListAPIView):
             queryset = queryset.filter(status=status)
             
         return queryset
+    
+
+
+
+class VendorSearchListView(generics.ListAPIView):
+    """
+    এই ভিউটি ভেন্ডরদের তালিকা দেখাবে এবং 
+    'search' ও 'category' প্যারামিটার দিয়ে খোঁজার সুবিধা দেবে।
+    """
+    queryset = VendorFollowed.objects.all()
+    serializer_class = FollowedVendorSerializer
+    
+    # কোন কোন ব্যাকএন্ড ব্যবহার করা হবে তা নির্ধারণ করা
+    filter_backends = [DjangoFilterBackend, SearchFilter]
+    
+    # DjangoFilterBackend-এর জন্য: কোন কোন ফিল্ড দিয়ে ফিল্টার করা যাবে
+    filterset_fields = ['category']
+    
+    # SearchFilter-এর জন্য: কোন কোন ফিল্ডে সার্চ করা হবে
+    search_fields = ['name']
+
+
+
+class MenuView(generics.ListAPIView):
+    """
+    এই ভিউটি সমস্ত মেনু ক্যাটাগরি এবং তাদের অধীনে থাকা আইটেমগুলোর তালিকা দেখাবে।
+    """
+    serializer_class = MenuCategorySerializer
+
+    def get_queryset(self):
+        """
+        ডেটাবেস পারফরম্যান্স অপটিমাইজ করার জন্য prefetch_related ব্যবহার করা হয়েছে।
+        """
+        return MenuCategory.objects.prefetch_related('items').all()

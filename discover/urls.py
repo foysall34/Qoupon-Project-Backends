@@ -1,5 +1,5 @@
 from django.urls import path
-from .views import  OrderListView,RestaurantListView , OfferDetailView , FavoriteOffersListView , FavoriteToggleView , PretCoffeeSubscriptionAPIView
+from .views import MenuView,VendorSearchListView, OrderListView,RestaurantListView , OfferDetailView , FavoriteOffersListView , FavoriteToggleView , PretCoffeeSubscriptionAPIView
 
 urlpatterns = [
     path('list/', RestaurantListView.as_view(), name='restaurant-list'),
@@ -10,5 +10,8 @@ urlpatterns = [
     path('qr-scanner/', PretCoffeeSubscriptionAPIView.as_view(), name='pret_offer_api'),
 
     path('my-orders/', OrderListView.as_view(), name='my-order-list'),
+
+    path('followed-vendors/', VendorSearchListView.as_view(), name='followed-vendor-list'),
+    path('menu/', MenuView.as_view(), name='menu-list'),
     
 ]

@@ -1,5 +1,5 @@
-from rest_framework import serializers
-from .models import Restaurant , Offer , Order
+from rest_framework import serializers 
+from .models import Restaurant , Offer , Order , VendorFollowed , MenuItem , MenuCategory
 from .models import Restaurant, Cuisine, Diet , CoffeeSubscriptionOffer
 
 
@@ -148,3 +148,58 @@ class OrderSerializer(serializers.ModelSerializer):
         if obj.product_image:
             return obj.product_image.url
         return None
+
+
+
+class FollowedVendorSerializer(serializers.ModelSerializer):
+    logo_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = VendorFollowed
+        fields = [
+            'id',
+            'title',
+            'category',
+            'logo',
+            'logo_url',
+            'is_followed',
+            'descriptions' ,
+            'expiry_date',
+
+
+        ]
+        extra_kwargs = {
+            
+            'logo': {'write_only': True},
+         }
+
+    def get_logo_url(self, obj):
+        if obj.logo:
+            return obj.logo.url
+        return None
+    
+
+class MenuItemSerializer(serializers.ModelSerializer):
+    image_url = serializers.SerializerMethodField()
+    class Meta:
+        model = MenuItem
+        fields = ['id', 'name', 'description', 'price', 'calories', 'image' , 'image_url']
+        extra_kwargs = {
+            
+            'image': {'write_only': True},
+         }
+
+    def get_image_url(self, obj):
+        if obj.image:
+            return obj.image.url
+        return None
+
+class MenuCategorySerializer(serializers.ModelSerializer):
+    """
+    ক্যাটাগরি এবং তার অধীনে থাকা সমস্ত আইটেম একসাথে দেখানোর জন্য সিরিয়ালাইজার।
+    """
+    items = MenuItemSerializer(many=True, read_only=True) # <-- নেস্টেড সিরিয়ালাইজার
+
+    class Meta:
+        model = MenuCategory
+        fields = ['id', 'name', 'items']

@@ -42,7 +42,6 @@ class ShopSerializer(serializers.ModelSerializer):
             'delivery_time_minutes',
             'distance_miles',
             'is_beyond_neighborhood',
-            'allows_pickup', 
             'has_offers', 
             'price_range',
             'logo',              # only for use write 
@@ -51,7 +50,13 @@ class ShopSerializer(serializers.ModelSerializer):
             'status_text',
             'shop_address', 
             'latitude',
-            'longitude' 
+            'longitude' ,
+            'offers',
+            'deal_validity',
+            'redemption_type',
+            'is_favourite',
+            'min_order'
+
                                 # Only for use write
         ]
         extra_kwargs = {

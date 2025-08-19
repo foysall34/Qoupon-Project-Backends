@@ -79,22 +79,15 @@ class FrequentSearchView(views.APIView):
 
 
 
-
-# ৫. মূল Search এবং Filter API
 class ShopFilter(FilterSet):
-        # শপের নামের জন্য ফিল্টার: 'istartswith' ব্যবহার করা হয়েছে
-    name = CharFilter(field_name='name', lookup_expr='istartswith')
-    
-    # ক্যাটাগরির নামের জন্য ফিল্টার: এখানেও 'istartswith' ব্যবহার করা হয়েছে
+    name = CharFilter(field_name='name', lookup_expr='istartswith')    
     category_name = CharFilter(field_name='category__name', lookup_expr='istartswith')
 
     class Meta:
         model = Shop
-        # বাকি ফিল্টারগুলো এখানে লিস্ট করুন
         fields = {
       
             'category': ['exact'],
-            'allows_pickup': ['exact'],
             'is_premium':['exact'],
             'has_offers': ['exact'],
             'price_range': ['exact', 'in'],
@@ -121,16 +114,14 @@ class ShopFilterView(generics.ListAPIView):
         # প্রথমে ডিফল্ট ফিল্টারিং চালিয়ে কোয়েরিসেটটি নিন
         queryset = self.filter_queryset(self.get_queryset())
 
-        # শর্ত পরীক্ষা করুন: ব্যবহারকারী কি category_name দিয়ে সার্চ করেছে এবং ফলাফল কি খালি?
+       
         if 'category_name' in request.query_params and not queryset.exists():
-            # যদি শর্ত পূরণ হয়, তাহলে কাস্টম রেসপন্স রিটার্ন করুন
             return Response(
                 {"detail": "Sorry,,This Category not found"}, 
                 status=status.HTTP_404_NOT_FOUND
             )
         
-        # যদি উপরের শর্ত পূরণ না হয়, তাহলে স্বাভাবিক কার্যক্রম চালান
-        # (যেমন: পেজিনেশন করা এবং ডেটা সিরিয়ালাইজ করা)
+
         page = self.paginate_queryset(queryset)
         if page is not None:
             serializer = self.get_serializer(page, many=True)

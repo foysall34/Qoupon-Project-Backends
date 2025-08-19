@@ -44,7 +44,7 @@ class OfferDetailView(RetrieveAPIView):
 
 
 class FavoriteToggleView(APIView):
-    permission_classes = [IsAuthenticated] 
+    permission_classes = [AllowAny] 
 
     def post(self, request, pk, format=None):
         try:
@@ -65,7 +65,7 @@ class FavoriteToggleView(APIView):
 
 class FavoriteOffersListView(ListAPIView):
     serializer_class = OfferSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
 
     def get_queryset(self):
         return self.request.user.favorite_offers.all()
@@ -113,11 +113,9 @@ class OrderListView(ListAPIView):
 
 
 class VendorSearchListView(generics.ListAPIView):
-
+    permission_classes = [AllowAny]
     queryset = VendorFollowed.objects.all()
     serializer_class = FollowedVendorSerializer
-    
- 
     filter_backends = [DjangoFilterBackend, SearchFilter]
     filterset_fields = ['category']
     search_fields = ['name']

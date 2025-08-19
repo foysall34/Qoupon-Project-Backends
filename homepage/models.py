@@ -5,7 +5,7 @@ from cloudinary.models import CloudinaryField
 from geopy.geocoders import Nominatim
 from geopy.exc import GeocoderTimedOut, GeocoderUnavailable
 
-
+from django.utils import timezone
 
 class Category(models.Model):
     name = models.CharField(max_length=100, unique=True)
@@ -15,6 +15,13 @@ class Category(models.Model):
         return self.name
 
 class Shop(models.Model):
+    Redemption_CHOICES = (
+        ('Delivery', 'Delivery'),
+        ('Pickup', 'Pickup'),
+        ('Delivery & Pickup', 'Delivery & Pickup'),
+    )
+
+
     name = models.CharField(max_length=200)
     category = models.ForeignKey(Category, related_name='shops', on_delete=models.SET_NULL, null=True)
     description = models.TextField(blank=True, null=True)
@@ -30,7 +37,6 @@ class Shop(models.Model):
     distance_miles = models.DecimalField(max_digits=5, decimal_places=1, default=1.0)
     is_beyond_neighborhood = models.BooleanField(default=False)
     is_premium = models.BooleanField(default=False)
-    allows_pickup = models.BooleanField(default=False)
     allows_delivery = models.BooleanField(default=True, help_text="support delivery or not")
     has_offers = models.BooleanField(default=False)
     shop_title = models.CharField(max_length=100 , null= True , blank=True)
@@ -39,6 +45,11 @@ class Shop(models.Model):
     )
     latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
     longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+    offers = models.CharField(max_length=200 , default="write offer")
+    deal_validity = models.DateTimeField(default=timezone.now)
+    redemption_type=models.CharField(max_length=30 , choices=Redemption_CHOICES , default="delivery & pickup")
+    is_favourite=models.BooleanField(default=False)
+    min_order=models.IntegerField(default=00)
 
 
 

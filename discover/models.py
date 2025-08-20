@@ -120,11 +120,6 @@ class VendorFollowed(models.Model):
 # payment ***************************************************************************************************
 class MenuCategory(models.Model):
     name = models.CharField(max_length=100, unique=True)
-    order = models.PositiveIntegerField(default=0)
-
-    class Meta:
-        ordering = ['order', 'name']
-        verbose_name_plural = "Menu Categories"
 
     def __str__(self):
         return self.name
@@ -149,23 +144,21 @@ class MenuItem(models.Model):
 
 
 
-class Customization(models.Model):
-    # যেমন: "Select Cheese", "Select Spreads"
-    name = models.CharField(max_length=100)
-    
-    def __str__(self):
-        return self.name
-    
-class CustomizationOption(models.Model):
-    customization = models.ForeignKey(Customization, on_delete=models.CASCADE, related_name='options')
-    # যেমন: "Cheddar", "Mayo", "Ranch"
-    name = models.CharField(max_length=100)
-    # কিছু অপশনের জন্য অতিরিক্ত মূল্য থাকতে পারে
-    additional_price = models.DecimalField(max_digits=6, decimal_places=2, default=0.00)
+class OptionGroup(models.Model):
+    item = models.ForeignKey(MenuItem, related_name='option_title', on_delete=models.CASCADE)
+    title = models.CharField(max_length=100)
+    is_required = models.BooleanField(default=False)
 
     def __str__(self):
-        return f"{self.customization.name} - {self.name}"
-    
+        return f"{self.title} for {self.item.name}"
+
+class OptionChoice(models.Model):
+    group = models.ForeignKey(OptionGroup, related_name='options', on_delete=models.CASCADE)
+    name = models.CharField(max_length=100)
+    price = models.CharField(max_length=20)  # 'Free', '$4.10' ইত্যাদি রাখার জন্য CharField ভালো
+
+    def __str__(self):
+        return self.name
 
 
 class Cart(models.Model):
@@ -186,7 +179,7 @@ class CartItem(models.Model):
     menu_item = models.ForeignKey(MenuItem, on_delete=models.CASCADE)
     quantity = models.PositiveIntegerField(default=1)
     # এই আইটেমের জন্য নির্বাচিত কাস্টমাইজেশন
-    selected_options = models.ManyToManyField(CustomizationOption, blank=True)
+    selected_options = models.ManyToManyField(OptionChoice, blank=True)
 
     def __str__(self):
         return f"{self.quantity} x {self.menu_item.name} in cart {self.cart.id}"

@@ -12,7 +12,7 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from .models import CoffeeSubscriptionOffer
-from .serializers import  CartSerializer,CartItemSerializer, CoffeeSubscriptionOfferSerializer , FollowedVendorSerializer , MenuCategorySerializer , MenuItemSerializer
+from .serializers import   CoffeeSubscriptionOfferSerializer , FollowedVendorSerializer , MenuCategorySerializer 
 from django.db.models import Count, Q
 from rest_framework import generics, permissions
 from rest_framework.filters import SearchFilter
@@ -122,120 +122,14 @@ class VendorSearchListView(generics.ListAPIView):
 
 
 
-class MenuView(generics.ListAPIView):
-
-    serializer_class = MenuCategorySerializer
-
-    def get_queryset(self):
-
-        return MenuCategory.objects.prefetch_related('items').all()
     
 
 # for payment ***************************************************************************************
-class CartDetailAPIView(APIView):
+class MenuCategoryListAPIView(generics.ListAPIView):
     """
-    লগইন করা ব্যবহারকারীর কার্টের বিস্তারিত তথ্য দেখায় এবং আপডেট করে (e.g., delivery type)।
-    GET, PUT, PATCH মেথড হ্যান্ডেল করে।
+    API endpoint that returns a list of menu categories with nested items and options.
     """
-    permission_classes = [IsAuthenticated]
-
-    def get_object(self):
-        """
-        সহায়ক মেথড: বর্তমান ব্যবহারকারীর জন্য কার্ট খুঁজে বের করে বা তৈরি করে।
-        """
-        cart, created = Cart.objects.get_or_create(user=self.request.user)
-        return cart
-
-    def get(self, request, *args, **kwargs):
-        """
-        কার্টের বিস্তারিত তথ্য দেখানোর জন্য GET রিকোয়েস্ট।
-        """
-        cart = self.get_object()
-        serializer = CartSerializer(cart, context={'request': request})
-        return Response(serializer.data)
-
-    def patch(self, request, *args, **kwargs):
-        """
-        কার্টের আংশিক তথ্য (যেমন delivery_type) আপডেট করার জন্য PATCH রিকোয়েস্ট।
-        """
-        cart = self.get_object()
-        # 'partial=True' দিয়ে আমরা আংশিক আপডেট করতে পারি
-        serializer = CartSerializer(cart, data=request.data, partial=True, context={'request': request})
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-# CartItemViewSet এর List এবং Create অংশের জন্য
-class CartItemListCreateAPIView(APIView):
-    """
-    ব্যবহারকারীর কার্টে থাকা আইটেমের তালিকা দেখায় (GET) এবং 
-    নতুন আইটেম যোগ করে (POST)।
-    """
-    permission_classes = [IsAuthenticated]
-
-    def get(self, request, *args, **kwargs):
-        """
-        কার্টে থাকা সব আইটেমের তালিকা দেখানোর জন্য।
-        """
-        cart_items = CartItem.objects.filter(cart__user=request.user)
-        serializer = CartItemSerializer(cart_items, many=True, context={'request': request})
-        return Response(serializer.data)
-
-    def post(self, request, *args, **kwargs):
-        """
-        কার্টে একটি নতুন আইটেম যোগ করার জন্য।
-        """
-        serializer = CartItemSerializer(data=request.data, context={'request': request})
-        if serializer.is_valid():
-            # ব্যবহারকারীর কার্ট খুঁজে বের করে তার সাথে আইটেমটি যুক্ত করে
-            cart, created = Cart.objects.get_or_create(user=request.user)
-            serializer.save(cart=cart)
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-
-# CartItemViewSet এর Retrieve, Update, Delete অংশের জন্য
-class CartItemDetailAPIView(APIView):
-    """
-    একটি নির্দিষ্ট কার্ট আইটেম দেখা (GET), আপডেট করা (PUT/PATCH), 
-    এবং ডিলিট করার (DELETE) জন্য।
-    """
-    permission_classes = [IsAuthenticated]
-
-    def get_object(self, pk):
-        """
-        সহায়ক মেথড: একটি নির্দিষ্ট কার্ট আইটেম খুঁজে বের করে, 
-        এবং নিশ্চিত করে যে এটি বর্তমান ব্যবহারকারীর।
-        """
-        try:
-            return CartItem.objects.get(pk=pk, cart__user=self.request.user)
-        except CartItem.DoesNotExist:
-            raise Http404
-
-    def get(self, request, pk, *args, **kwargs):
-        """
-        একটি নির্দিষ্ট আইটেমের বিস্তারিত তথ্য দেখানোর জন্য।
-        """
-        cart_item = self.get_object(pk)
-        serializer = CartItemSerializer(cart_item, context={'request': request})
-        return Response(serializer.data)
-
-    def patch(self, request, pk, *args, **kwargs):
-        """
-        একটি নির্দিষ্ট আইটেমের পরিমাণ (quantity) আপডেট করার জন্য।
-        """
-        cart_item = self.get_object(pk)
-        serializer = CartItemSerializer(cart_item, data=request.data, partial=True, context={'request': request})
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-    def delete(self, request, pk, *args, **kwargs):
-        """
-        একটি নির্দিষ্ট আইটেম কার্ট থেকে ডিলিট করার জন্য।
-        """
-        cart_item = self.get_object(pk)
-        cart_item.delete()
-        return Response(status=status.HTTP_204_NO_CONTENT)
+    queryset = MenuCategory.objects.all().prefetch_related(
+        'items__option_title__options'
+    )
+    serializer_class = MenuCategorySerializer

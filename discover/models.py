@@ -160,13 +160,13 @@ class OptionChoice(models.Model):
     def __str__(self):
         return self.name
 
-
+# for cart ************************
 class Cart(models.Model):
     class DeliveryType(models.TextChoices):
         DELIVERY = 'delivery', 'Delivery'
         PICKUP = 'pickup', 'Pickup'
 
-    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='cart')
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='cart')
     delivery_type = models.CharField(max_length=10, choices=DeliveryType.choices, default=DeliveryType.PICKUP)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -176,10 +176,8 @@ class Cart(models.Model):
     
 class CartItem(models.Model):
     cart = models.ForeignKey(Cart, on_delete=models.CASCADE, related_name='items')
-    menu_item = models.ForeignKey(MenuItem, on_delete=models.CASCADE)
     quantity = models.PositiveIntegerField(default=1)
+    item_id = models.IntegerField(default=00) 
     # এই আইটেমের জন্য নির্বাচিত কাস্টমাইজেশন
-    selected_options = models.ManyToManyField(OptionChoice, blank=True)
 
-    def __str__(self):
-        return f"{self.quantity} x {self.menu_item.name} in cart {self.cart.id}"
+  

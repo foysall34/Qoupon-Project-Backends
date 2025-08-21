@@ -1,6 +1,6 @@
 from rest_framework import serializers 
 from .models import Restaurant , Offer , Order , VendorFollowed , MenuItem , MenuCategory
-from .models import Restaurant, Cuisine, Diet , CoffeeSubscriptionOffer , OptionChoice , OptionGroup
+from .models import Restaurant, Cuisine, Diet , CoffeeSubscriptionOffer , OptionChoice , OptionGroup , Cart,CartItem
 from decimal import Decimal
 
 
@@ -250,3 +250,25 @@ class MenuCategorySerializer(serializers.ModelSerializer):
     class Meta:
         model = MenuCategory
         fields = ['id', 'name', 'items']
+        
+ # cart serializers ********************************
+
+class CartItemSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CartItem
+        fields = ['item_id', 'quantity']
+
+class CartSerializer(serializers.ModelSerializer):
+    items = CartItemSerializer(many=True)
+
+    class Meta:
+        model = Cart
+        fields = ['id', 'delivery_type', 'items']
+
+    def create(self, validated_data):
+        items_data = validated_data.pop('items')
+        user = self.context['request'].user
+        cart = Cart.objects.create(user=user, **validated_data)
+        for item in items_data:
+            CartItem.objects.create(cart=cart, **item)
+        return cart        

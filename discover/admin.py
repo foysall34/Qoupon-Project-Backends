@@ -1,12 +1,12 @@
 from django.contrib import admin
-from .models import OptionGroup, OptionChoice, Cart,CartItem,Restaurant, Cuisine , Diet, Offer, CoffeeSubscriptionOffer , Order ,  VendorFollowed , MenuItem, MenuCategory
+from .models import CartItem, Cart,OptionGroup, OptionChoice, Cart,CartItem,Restaurant, Cuisine , Diet, Offer, CoffeeSubscriptionOffer , Order ,  VendorFollowed , MenuItem, MenuCategory
 
 
 
 admin.site.register(Cart)
+admin.site.register(CartItem)
 admin.site.register(OptionGroup)
 admin.site.register(OptionChoice)
-admin.site.register(CartItem)
 admin.site.register(MenuCategory)
 admin.site.register(MenuItem)
 admin.site.register(VendorFollowed)

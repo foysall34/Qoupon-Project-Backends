@@ -1,7 +1,7 @@
 from rest_framework.generics import ListAPIView
 from django.http import Http404
 from .models import Restaurant
-from .serializers import RestaurantSerializer, OfferSerializer  , OrderSerializer
+from .serializers import RestaurantSerializer, OfferSerializer  , OrderSerializer , CartSerializer
 from rest_framework.permissions import AllowAny 
 from django_filters import rest_framework as filters
 from .models import Restaurant, Cuisine, Diet, Offer , Order , VendorFollowed , MenuItem, MenuCategory, CartItem, Cart
@@ -124,7 +124,7 @@ class VendorSearchListView(generics.ListAPIView):
 
     
 
-# for payment ***************************************************************************************
+# for menu  ***************************************************************************************
 class MenuCategoryListAPIView(generics.ListAPIView):
     """
     API endpoint that returns a list of menu categories with nested items and options.
@@ -133,3 +133,26 @@ class MenuCategoryListAPIView(generics.ListAPIView):
         'items__option_title__options'
     )
     serializer_class = MenuCategorySerializer
+
+
+
+class MenuCategoryDetailAPIView(generics.RetrieveUpdateAPIView):
+    """
+    API endpoint for retrieving and updating a single menu category.
+    """
+    queryset = MenuCategory.objects.all().prefetch_related(
+        'items__option_title__options'
+    )
+    serializer_class = MenuCategorySerializer
+
+
+
+# for cart viwes.py 
+class CartView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        serializer = CartSerializer(data=request.data, context={'request': request})
+        serializer.is_valid(raise_exception=True)
+        cart = serializer.save()
+        return Response(CartSerializer(cart).data, status=status.HTTP_201_CREATED)

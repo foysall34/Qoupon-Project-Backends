@@ -1,5 +1,16 @@
 from django.urls import path
-from .views import  CartView,MenuCategoryDetailAPIView,MenuCategoryListAPIView,VendorSearchListView, OrderListView,RestaurantListView , OfferDetailView , FavoriteOffersListView , FavoriteToggleView , PretCoffeeSubscriptionAPIView
+from .views import  VendorSearchListView, OrderListView,RestaurantListView , OfferDetailView , FavoriteOffersListView , FavoriteToggleView , PretCoffeeSubscriptionAPIView
+from django.urls import path, include
+from rest_framework.routers import DefaultRouter
+from . import views
+
+
+router = DefaultRouter()
+
+router.register(r'menu', views.MenuViewSet, basename='menu')
+router.register(r'cart-items', views.CartItemViewSet, basename='cart-item')
+
+
 
 urlpatterns = [
     path('list/', RestaurantListView.as_view(), name='restaurant-list'),
@@ -12,16 +23,18 @@ urlpatterns = [
     path('my-orders/', OrderListView.as_view(), name='my-order-list'),
 
     path('followed-vendors/', VendorSearchListView.as_view(), name='followed-vendor-list'),
-    path('menu/', MenuCategoryListAPIView.as_view(), name='menu-list'),
-    path('menu-categories/<int:pk>/', MenuCategoryDetailAPIView.as_view(), name='menucategory-detail'),
-    path('cart/', CartView.as_view(), name='cart-create'),
-        # /api/cart/ - কার্টের বিস্তারিত তথ্যের জন্য
-    # path('cart/', CartDetailAPIView.as_view(), name='cart-detail-api'),
+    path('cart/',views.CartViewSet.as_view({'get': 'retrieve', 'patch': 'update', 'put': 'update'}),name='cart-detail'
+    ),
     
-    # # /api/cart-items/ - আইটেমের তালিকা দেখা এবং নতুন আইটেম যোগ করা
-    # path('cart-items/', CartItemListCreateAPIView.as_view(), name='cart-item-list-create-api'),
-    
-    # # /api/cart-items/<pk>/ - একটি নির্দিষ্ট আইটেম দেখা, আপডেট করা বা ডিলিট করা
-    # path('cart-items/<int:pk>/', CartItemDetailAPIView.as_view(), name='cart-item-detail-api'),
+    path('', include(router.urls)),
+   
     
 ]
+
+
+
+
+
+
+
+

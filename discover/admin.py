@@ -1,5 +1,6 @@
 from django.contrib import admin
-from .models import CartItem, Cart,OptionGroup, OptionChoice, Cart,CartItem,Restaurant, Cuisine , Diet, Offer, CoffeeSubscriptionOffer , Order ,  VendorFollowed , MenuItem, MenuCategory
+# from .models import
+from .models import  MenuItem, MenuCategory,CartItem, Cart,OptionGroup, OptionChoice, Cart,CartItem, Restaurant, Cuisine , Diet, Offer, CoffeeSubscriptionOffer , Order ,  VendorFollowed 
 
 
 

@@ -1,6 +1,6 @@
 from rest_framework import serializers 
-from .models import Restaurant , Offer , Order , VendorFollowed , MenuItem , MenuCategory
-from .models import Restaurant, Cuisine, Diet , CoffeeSubscriptionOffer , OptionChoice , OptionGroup , Cart,CartItem
+from .models import Restaurant , Offer , Order , VendorFollowed 
+from .models import Restaurant, Cuisine, Diet , CoffeeSubscriptionOffer 
 from decimal import Decimal
 
 
@@ -178,97 +178,128 @@ class FollowedVendorSerializer(serializers.ModelSerializer):
             return obj.logo.url
         return None
     
+# cart + menu + payment *********************
+# your_app/serializers.py
 
-class MenuItemSerializer(serializers.ModelSerializer):
-    image_url = serializers.SerializerMethodField()
-    class Meta:
-        model = MenuItem
-        fields = ['id', 'name', 'description', 'price', 'calories', 'image' , 'image_url']
-        extra_kwargs = {
-            
-            'image': {'write_only': True},
-         }
-
-    def get_image_url(self, obj):
-        if obj.image:
-            return obj.image.url
-        return None
-
-class MenuCategorySerializer(serializers.ModelSerializer):
-    """
-    ক্যাটাগরি এবং তার অধীনে থাকা সমস্ত আইটেম একসাথে দেখানোর জন্য সিরিয়ালাইজার।
-    """
-    items = MenuItemSerializer(many=True, read_only=True) # <-- নেস্টেড সিরিয়ালাইজার
-
-    class Meta:
-        model = MenuCategory
-        fields = ['id', 'name', 'items']
-
-# payment *************************************************************************
-
+from rest_framework import serializers
+from .models import (
+    MenuCategory, MenuItem, OptionGroup, OptionChoice, Cart, CartItem
+)
 
 
 class OptionChoiceSerializer(serializers.ModelSerializer):
-    # JSON-এ is_selected ফিল্ডটি দেখানোর জন্য, যদিও এটি মডেলে নেই
-    is_selected = serializers.BooleanField(default=False, read_only=True)
-
     class Meta:
         model = OptionChoice
         fields = ['id', 'name', 'price', 'is_selected']
 
 class OptionGroupSerializer(serializers.ModelSerializer):
-    # 'related_name' ব্যবহার করে নেস্টেড অপশনগুলো আনা হচ্ছে
     options = OptionChoiceSerializer(many=True, read_only=True)
-
     class Meta:
         model = OptionGroup
         fields = ['id', 'title', 'is_required', 'options']
 
 class MenuItemSerializer(serializers.ModelSerializer):
-    # 'related_name' ব্যবহার করে নেস্টেড অপশন গ্রুপগুলো আনা হচ্ছে
     option_title = OptionGroupSerializer(many=True, read_only=True)
     image_url = serializers.SerializerMethodField()
-
     class Meta:
         model = MenuItem
-        fields = ['id', 'name', 'description', 'price', 'calories', 'image_url', 'image', 'option_title']
+        fields = [
+            'id', 'name', 'description', 'price', 'calories', 
+            'image','image_url', 'is_selected', 'option_title'
+        ]
+
         extra_kwargs = {
-            
-            'image': {'write_only': True},
-         }
-        
+            'image': {'write_only': True}
+        }
     def get_image_url(self, obj):
+        
         if obj.image:
             return obj.image.url
-        return None
+        return None 
+        
 
 
 class MenuCategorySerializer(serializers.ModelSerializer):
-    # 'related_name' ব্যবহার করে নেস্টেড আইটেমগুলো আনা হচ্ছে
     items = MenuItemSerializer(many=True, read_only=True)
-
     class Meta:
         model = MenuCategory
         fields = ['id', 'name', 'items']
-        
- # cart serializers ********************************
+
+
 
 class CartItemSerializer(serializers.ModelSerializer):
+    """ কার্টে থাকা আইটেমগুলো দেখানোর জন্য। """
+    menu_item = MenuItemSerializer(read_only=True)
+    selected_options = OptionChoiceSerializer(many=True, read_only=True)
+    
+    # মডেলের প্রপার্টিগুলো সরাসরি দেখানোর জন্য
+    add_to_cart_price = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    total_price = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+
     class Meta:
         model = CartItem
-        fields = ['item_id', 'quantity']
+        fields = [
+            'id', 'menu_item', 'quantity', 'selected_options', 
+            'add_to_cart_price', 'total_price'
+        ]
+
+class AddCartItemSerializer(serializers.ModelSerializer):
+    """ কার্টে নতুন আইটেম যোগ করার জন্য। """
+    menu_item_id = serializers.IntegerField(write_only=True)
+    option_ids = serializers.ListField(
+        child=serializers.IntegerField(), required=False, default=[], write_only=True
+    )
+
+    class Meta:
+        model = CartItem
+        fields = ['id', 'menu_item_id', 'quantity', 'option_ids']
+        read_only_fields = ['id']
+
+    def create(self, validated_data):
+        cart = self.context['cart']
+        menu_item_id = validated_data['menu_item_id']
+        quantity = validated_data['quantity']
+        option_ids = validated_data['option_ids']
+
+        # TODO: একই আইটেম এবং অপশনসহ থাকলে quantity বাড়ানোর লজিক যোগ করা যেতে পারে।
+        # আপাতত, প্রতিটি অ্যাডে নতুন আইটেম তৈরি হবে।
+        cart_item = CartItem.objects.create(
+            cart=cart, menu_item_id=menu_item_id, quantity=quantity
+        )
+        if option_ids:
+            options = OptionChoice.objects.filter(id__in=option_ids)
+            cart_item.selected_options.set(options)
+        
+        return cart_item
+
+class UpdateCartItemSerializer(serializers.ModelSerializer):
+    """ শুধুমাত্র কার্ট আইটেমের পরিমাণ আপডেট করার জন্য। """
+    class Meta:
+        model = CartItem
+        fields = ['quantity']
+        extra_kwargs = {
+            'quantity': {'min_value': 1}
+        }
 
 class CartSerializer(serializers.ModelSerializer):
-    items = CartItemSerializer(many=True)
+    """ সম্পূর্ণ কার্ট দেখানোর জন্য। """
+    items = CartItemSerializer(many=True, read_only=True)
+    price_summary = serializers.SerializerMethodField()
 
     class Meta:
         model = Cart
-        fields = ['id', 'delivery_type', 'items']
+        fields = ['id', 'user', 'delivery_type', 'items', 'price_summary']
+        read_only_fields = ['id', 'user']
 
-    def create(self, validated_data):
-        items_data = validated_data.pop('items')
-        user = self.context['request'].user
-        cart = Cart.objects.create(user=user, **validated_data)
-        for item in items_data:
-            CartItem.objects.create(cart=cart, **item)
-        return cart        
+    def get_price_summary(self, cart: Cart) -> dict:
+        return {
+            'sub_total_price': cart.sub_total_price,
+            'delivery_charges': cart.delivery_charges,
+            'in_total_price': cart.in_total_price
+        }
+
+
+
+
+
+

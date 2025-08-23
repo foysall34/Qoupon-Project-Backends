@@ -4,6 +4,7 @@ from django.conf import settings
 from django.utils import timezone
 from django.db.models.signals import post_save
 from django.dispatch import receiver
+from decimal import Decimal
 
 class Cuisine(models.Model):
     name = models.CharField(max_length=100, unique=True)
@@ -117,9 +118,31 @@ class VendorFollowed(models.Model):
         return self.category
 
 
-# payment ***************************************************************************************************
+# Menu + add to cart  ***************************************************************************
+# your_app/models.py
+
+from django.db import models
+from django.conf import settings
+from decimal import Decimal
+from cloudinary.models import CloudinaryField
+
+
+User = settings.AUTH_USER_MODEL
+
+# Menu + add to cart  ***************************************************************************************************
+
 class MenuCategory(models.Model):
     name = models.CharField(max_length=100, unique=True)
+    # ব্যবহারকারীর সাথে সম্পর্ক, যা খালিও থাকতে পারে
+    user = models.ForeignKey(
+        User, 
+        on_delete=models.SET_NULL, # ইউজার ডিলিট হলে ক্যাটাগরি ডিলিট হবে না
+        null=True, 
+        blank=True
+    )
+
+    class Meta:
+        verbose_name_plural = "Menu Categories" # Admin প্যানেলে দেখতে সুন্দর লাগবে
 
     def __str__(self):
         return self.name
@@ -131,10 +154,12 @@ class MenuItem(models.Model):
         related_name='items'
     )
     name = models.CharField(max_length=200)
-    description = models.TextField()
-    price = models.DecimalField(max_digits=6, decimal_places=2)
-    calories = models.PositiveIntegerField()
-    image = CloudinaryField('image')
+    description = models.TextField(blank=True)
+    price = models.DecimalField(max_digits=10, decimal_places=2)
+    calories = models.PositiveIntegerField(null=True, blank=True)
+    image = CloudinaryField('image', null=True, blank=True)
+    is_selected = models.BooleanField(default=False)
+    
 
     class Meta:
         ordering = ['name']
@@ -142,11 +167,10 @@ class MenuItem(models.Model):
     def __str__(self):
         return self.name
 
-
-
 class OptionGroup(models.Model):
     item = models.ForeignKey(MenuItem, related_name='option_title', on_delete=models.CASCADE)
     title = models.CharField(max_length=100)
+    # এই গ্রুপের কোনো অপশন সিলেক্ট করা আবশ্যক কিনা
     is_required = models.BooleanField(default=False)
 
     def __str__(self):
@@ -155,29 +179,106 @@ class OptionGroup(models.Model):
 class OptionChoice(models.Model):
     group = models.ForeignKey(OptionGroup, related_name='options', on_delete=models.CASCADE)
     name = models.CharField(max_length=100)
-    price = models.CharField(max_length=20)  # 'Free', '$4.10' ইত্যাদি রাখার জন্য CharField ভালো
+    # অপশনের জন্য অতিরিক্ত মূল্য
+    price = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
+    # এই অপশনটি ডিফল্টভাবে নির্বাচিত কিনা
+    is_selected = models.BooleanField(default=False)
 
     def __str__(self):
-        return self.name
+        return f"{self.name} (+{self.price})"
 
-# for cart ************************
+# for cart **************************************************************************************************************
+
 class Cart(models.Model):
     class DeliveryType(models.TextChoices):
-        DELIVERY = 'delivery', 'Delivery'
-        PICKUP = 'pickup', 'Pickup'
+        PICKUP = 'PICKUP', 'Pickup'
+        DELIVERY = 'DELIVERY', 'Delivery'
 
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='cart')
-    delivery_type = models.CharField(max_length=10, choices=DeliveryType.choices, default=DeliveryType.PICKUP)
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='cart')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    delivery_type = models.CharField(
+        max_length=10, choices=DeliveryType.choices, default=DeliveryType.DELIVERY
+    )
+
+    @property
+    def sub_total_price(self):
+        """
+        এটি আপনার চাওয়া 'sub total price (with quantity)'।
+        কার্টের সমস্ত আইটেমের মোট মূল্য (quantity সহ) হিসাব করে।
+        """
+        return sum((item.total_price for item in self.items.all()), start=Decimal(0))
+
+    @property
+    def delivery_charges(self) -> Decimal:
+        """
+        এটি আপনার চাওয়া ফিক্সড 'delivery charges'।
+        ডেলিভারি টাইপের উপর ভিত্তি করে চার্জ নির্ধারণ করে।
+        """
+        if self.delivery_type == self.DeliveryType.DELIVERY:
+            return Decimal("1.99")
+        return Decimal("0.00") # Pickup-এর জন্য কোনো চার্জ নেই
+
+    @property
+    def in_total_price(self):
+        """
+        এটি আপনার চাওয়া 'In total price (delivery charge + sub total price)'।
+        """
+        return self.sub_total_price + self.delivery_charges
 
     def __str__(self):
         return f"Cart for {self.user.email}"
-    
+
 class CartItem(models.Model):
     cart = models.ForeignKey(Cart, on_delete=models.CASCADE, related_name='items')
+    menu_item = models.ForeignKey(MenuItem, on_delete=models.CASCADE)
     quantity = models.PositiveIntegerField(default=1)
-    item_id = models.IntegerField(default=00) 
-    # এই আইটেমের জন্য নির্বাচিত কাস্টমাইজেশন
+    selected_options = models.ManyToManyField(OptionChoice, blank=True)
+
+    @property
+    def add_to_cart_price(self):
+        """
+        এটি আপনার চাওয়া 'add to cart price (without quantity)'।
+        একটি আইটেমের একক মূল্য হিসাব করে (অপশন সহ)।
+        """
+        base_price = self.menu_item.price
+        options_price = sum(
+            (option.price for option in self.selected_options.all()),
+            start=Decimal(0)
+        )
+        return base_price + options_price
+
+    @property
+    def total_price(self):
+        """
+        এটি একটি CartItem-এর জন্য quantity সহ মোট মূল্য।
+        (এই প্রপার্টিটি sub_total_price গণনার জন্য ব্যবহৃত হয়)
+        """
+        return self.add_to_cart_price * self.quantity
+
+    def increase_quantity(self, amount: int = 1):
+        """ কার্ট আইটেমের পরিমাণ বাড়ায়। """
+        self.quantity += amount
+        self.save()
+
+    def decrease_quantity(self, amount: int = 1):
+        """
+        কার্ট আইটেমের পরিমাণ কমায়। যদি পরিমাণ শূন্য বা তার কম হয়ে যায়,
+        তাহলে আইটেমটি কার্ট থেকে ডিলিট হয়ে যায়।
+        """
+        if self.quantity <= amount:
+            self.delete()
+        else:
+            self.quantity -= amount
+            self.save()
+
+    def __str__(self):
+        return f"{self.quantity} x {self.menu_item.name} in {self.cart}"
+
+
+
+
+
+   
 
   

@@ -205,7 +205,7 @@ class MenuItemSerializer(serializers.ModelSerializer):
         model = MenuItem
         fields = [
             'id', 'name', 'description', 'price', 'calories', 
-            'image','image_url', 'is_selected', 'option_title'
+            'image','image_url', 'added_to_cart', 'option_title'
         ]
 
         extra_kwargs = {
@@ -221,9 +221,10 @@ class MenuItemSerializer(serializers.ModelSerializer):
 
 class MenuCategorySerializer(serializers.ModelSerializer):
     items = MenuItemSerializer(many=True, read_only=True)
+    user_email = serializers.EmailField(source='user.email', read_only=True, allow_null=True)
     class Meta:
         model = MenuCategory
-        fields = ['id', 'name', 'items']
+        fields = ['id','user_email', 'name', 'items']
 
 
 
@@ -285,11 +286,12 @@ class CartSerializer(serializers.ModelSerializer):
     """ সম্পূর্ণ কার্ট দেখানোর জন্য। """
     items = CartItemSerializer(many=True, read_only=True)
     price_summary = serializers.SerializerMethodField()
+    user_email = serializers.EmailField(source = 'user.email' , read_only = True , allow_null=True )
 
     class Meta:
         model = Cart
-        fields = ['id', 'user', 'delivery_type', 'items', 'price_summary']
-        read_only_fields = ['id', 'user']
+        fields = ['id','user_email', 'user', 'delivery_type', 'items', 'price_summary']
+        read_only_fields = ['id', 'user' , 'user_email']
 
     def get_price_summary(self, cart: Cart) -> dict:
         return {

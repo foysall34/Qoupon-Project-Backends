@@ -158,7 +158,7 @@ class MenuItem(models.Model):
     price = models.DecimalField(max_digits=10, decimal_places=2)
     calories = models.PositiveIntegerField(null=True, blank=True)
     image = CloudinaryField('image', null=True, blank=True)
-    is_selected = models.BooleanField(default=False)
+    added_to_cart = models.BooleanField(default=False)
     
 
     class Meta:

@@ -193,13 +193,13 @@ class OptionChoiceSerializer(serializers.ModelSerializer):
         fields = ['id', 'name', 'price', 'is_selected']
 
 class OptionGroupSerializer(serializers.ModelSerializer):
-    options = OptionChoiceSerializer(many=True, read_only=True)
+    options = OptionChoiceSerializer(many=True)
     class Meta:
         model = OptionGroup
         fields = ['id', 'title', 'is_required', 'options']
 
 class MenuItemSerializer(serializers.ModelSerializer):
-    option_title = OptionGroupSerializer(many=True, read_only=True)
+    option_title = OptionGroupSerializer(many=True)
     image_url = serializers.SerializerMethodField()
     class Meta:
         model = MenuItem
@@ -220,7 +220,7 @@ class MenuItemSerializer(serializers.ModelSerializer):
 
 
 class MenuCategorySerializer(serializers.ModelSerializer):
-    items = MenuItemSerializer(many=True, read_only=True)
+    items = MenuItemSerializer(many=True)
     user_email = serializers.EmailField(source='user.email', read_only=True, allow_null=True)
     class Meta:
         model = MenuCategory

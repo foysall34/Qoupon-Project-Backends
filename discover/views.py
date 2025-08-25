@@ -18,6 +18,19 @@ from rest_framework import generics, permissions
 from rest_framework.filters import SearchFilter
 from django_filters.rest_framework import DjangoFilterBackend
 
+from rest_framework.viewsets import ReadOnlyModelViewSet, ModelViewSet, GenericViewSet
+from rest_framework.mixins import RetrieveModelMixin, UpdateModelMixin
+from rest_framework.decorators import action
+from rest_framework.response import Response
+from rest_framework import status
+from rest_framework.permissions import IsAuthenticated
+
+from .models import MenuCategory, Cart, CartItem, MenuItem, OptionChoice, OptionGroup
+from .serializers import (
+    MenuCategorySerializer, CartSerializer, CartItemSerializer,
+    AddCartItemSerializer, UpdateCartItemSerializer, MenuItemSerializer
+)
+
 
 
 
@@ -123,36 +136,55 @@ class VendorSearchListView(generics.ListAPIView):
     search_fields = ['name']
 
 
-
-    
-
 # for menu  ***************************************************************************************
-# your_app/views.py
 
 
-# your_app/views.py
 
-from rest_framework.viewsets import ReadOnlyModelViewSet, ModelViewSet, GenericViewSet
-from rest_framework.mixins import RetrieveModelMixin, UpdateModelMixin
-from rest_framework.decorators import action
-from rest_framework.response import Response
-from rest_framework import status
-from rest_framework.permissions import IsAuthenticated
 
-from .models import MenuCategory, Cart, CartItem
-from .serializers import (
-    MenuCategorySerializer, CartSerializer, CartItemSerializer,
-    AddCartItemSerializer, UpdateCartItemSerializer
-)
-
-class MenuViewSet(ReadOnlyModelViewSet):
+# 👇👇👇 নিশ্চিত করুন যে আপনার ViewSet-টি এমন দেখাচ্ছে 👇👇👇
+class MenuCategoryViewSet(ModelViewSet):
     """
-    মেনু এবং এর আইটেমগুলো দেখার জন্য একটি read-only API এন্ডপয়েন্ট।
+    এই ViewSet-টি মেনু ক্যাটাগরি এবং এর আইটেমগুলো পরিচালনা করে।
     """
+    # --- এই দুটি লাইন থাকা আবশ্যক ---
     queryset = MenuCategory.objects.prefetch_related(
         'items__option_title__options'
     ).all()
     serializer_class = MenuCategorySerializer
+    # ---------------------------------
+
+    @action(detail=True, methods=['patch'], url_path='update-item-selection')
+    def update_item_selection(self, request, pk=None):
+        # ... আপনার কাস্টম অ্যাকশনের বাকি কোড ...
+        category = self.get_object()
+        
+        item_id = request.data.get('item_id')
+        option_id = request.data.get('option_id')
+        add_to_cart_value = request.data.get('added_to_cart')
+        is_selected_value = request.data.get('is_selected')
+
+        try:
+            menu_item = MenuItem.objects.get(id=item_id, category=category)
+        except MenuItem.DoesNotExist:
+            return Response({"error": f"MenuItem with id {item_id} not found in this category."}, status=status.HTTP_404_NOT_FOUND)
+
+        if add_to_cart_value is not None:
+            menu_item.added_to_cart = add_to_cart_value
+            menu_item.save(update_fields=['added_to_cart'])
+
+        if option_id is not None and is_selected_value is not None:
+            try:
+                valid_option_groups = OptionGroup.objects.filter(item=menu_item)
+                option = OptionChoice.objects.get(id=option_id, group__in=valid_option_groups)
+                option.is_selected = is_selected_value
+                option.save(update_fields=['is_selected'])
+            except OptionChoice.DoesNotExist:
+                return Response({"error": f"OptionChoice with id {option_id} not found for this item."}, status=status.HTTP_404_NOT_FOUND)
+
+        refreshed_category = MenuCategory.objects.get(id=pk)
+        serializer = self.get_serializer(refreshed_category)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    
 
 class CartViewSet(RetrieveModelMixin, UpdateModelMixin, GenericViewSet):
     """

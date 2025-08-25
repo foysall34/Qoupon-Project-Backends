@@ -5,6 +5,11 @@ from django.utils import timezone
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 from decimal import Decimal
+from django.db import models
+from django.conf import settings
+from decimal import Decimal
+from cloudinary.models import CloudinaryField
+
 
 class Cuisine(models.Model):
     name = models.CharField(max_length=100, unique=True)
@@ -118,13 +123,7 @@ class VendorFollowed(models.Model):
         return self.category
 
 
-# Menu + add to cart  ***************************************************************************
-# your_app/models.py
 
-from django.db import models
-from django.conf import settings
-from decimal import Decimal
-from cloudinary.models import CloudinaryField
 
 
 User = settings.AUTH_USER_MODEL
@@ -132,35 +131,24 @@ User = settings.AUTH_USER_MODEL
 # Menu + add to cart  ***************************************************************************************************
 
 class MenuCategory(models.Model):
-    name = models.CharField(max_length=100, unique=True)
-    # ব্যবহারকারীর সাথে সম্পর্ক, যা খালিও থাকতে পারে
-    user = models.ForeignKey(
-        User, 
-        on_delete=models.SET_NULL, # ইউজার ডিলিট হলে ক্যাটাগরি ডিলিট হবে না
-        null=True, 
-        blank=True
-    )
+    name = models.CharField(max_length=100, unique=True , null=True)
+    user = models.ForeignKey(User,on_delete=models.SET_NULL, null=True, blank=True)
 
     class Meta:
-        verbose_name_plural = "Menu Categories" # Admin প্যানেলে দেখতে সুন্দর লাগবে
+        verbose_name_plural = "Menu Categories" 
 
     def __str__(self):
         return self.name
 
 class MenuItem(models.Model):
-    category = models.ForeignKey(
-        MenuCategory, 
-        on_delete=models.CASCADE, 
-        related_name='items'
-    )
-    name = models.CharField(max_length=200)
+    category = models.ForeignKey(MenuCategory,on_delete=models.CASCADE, related_name='items')
+    name = models.CharField(max_length=200 , null=True)
     description = models.TextField(blank=True)
     price = models.DecimalField(max_digits=10, decimal_places=2)
     calories = models.PositiveIntegerField(null=True, blank=True)
     image = CloudinaryField('image', null=True, blank=True)
     added_to_cart = models.BooleanField(default=False)
     
-
     class Meta:
         ordering = ['name']
 
@@ -170,7 +158,6 @@ class MenuItem(models.Model):
 class OptionGroup(models.Model):
     item = models.ForeignKey(MenuItem, related_name='option_title', on_delete=models.CASCADE)
     title = models.CharField(max_length=100)
-    # এই গ্রুপের কোনো অপশন সিলেক্ট করা আবশ্যক কিনা
     is_required = models.BooleanField(default=False)
 
     def __str__(self):
@@ -179,9 +166,7 @@ class OptionGroup(models.Model):
 class OptionChoice(models.Model):
     group = models.ForeignKey(OptionGroup, related_name='options', on_delete=models.CASCADE)
     name = models.CharField(max_length=100)
-    # অপশনের জন্য অতিরিক্ত মূল্য
     price = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
-    # এই অপশনটি ডিফল্টভাবে নির্বাচিত কিনা
     is_selected = models.BooleanField(default=False)
 
     def __str__(self):
@@ -197,32 +182,22 @@ class Cart(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='cart')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    delivery_type = models.CharField(
-        max_length=10, choices=DeliveryType.choices, default=DeliveryType.DELIVERY
-    )
+    delivery_type = models.CharField(max_length=10, choices=DeliveryType.choices, default=DeliveryType.DELIVERY)
 
     @property
     def sub_total_price(self):
-        """
-        এটি আপনার চাওয়া 'sub total price (with quantity)'।
-        কার্টের সমস্ত আইটেমের মোট মূল্য (quantity সহ) হিসাব করে।
-        """
         return sum((item.total_price for item in self.items.all()), start=Decimal(0))
 
     @property
     def delivery_charges(self) -> Decimal:
-        """
-        এটি আপনার চাওয়া ফিক্সড 'delivery charges'।
-        ডেলিভারি টাইপের উপর ভিত্তি করে চার্জ নির্ধারণ করে।
-        """
         if self.delivery_type == self.DeliveryType.DELIVERY:
             return Decimal("1.99")
-        return Decimal("0.00") # Pickup-এর জন্য কোনো চার্জ নেই
+        return Decimal("0.00") # No charge to declared for pickUp
 
     @property
     def in_total_price(self):
         """
-        এটি আপনার চাওয়া 'In total price (delivery charge + sub total price)'।
+        'In total price (delivery charge + sub total price)'।
         """
         return self.sub_total_price + self.delivery_charges
 
@@ -238,8 +213,8 @@ class CartItem(models.Model):
     @property
     def add_to_cart_price(self):
         """
-        এটি আপনার চাওয়া 'add to cart price (without quantity)'।
-        একটি আইটেমের একক মূল্য হিসাব করে (অপশন সহ)।
+       'add to cart price (without quantity)'।
+     
         """
         base_price = self.menu_item.price
         options_price = sum(

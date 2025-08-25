@@ -7,8 +7,9 @@ from . import views
 
 router = DefaultRouter()
 
-router.register(r'menu', views.MenuViewSet, basename='menu')
+router.register(r'menu', views.MenuCategoryViewSet, basename='menu')
 router.register(r'cart-items', views.CartItemViewSet, basename='cart-item')
+
 
 
 

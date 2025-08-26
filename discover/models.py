@@ -214,21 +214,13 @@ class CartItem(models.Model):
     def add_to_cart_price(self):
         """
        'add to cart price (without quantity)'।
-     
         """
         base_price = self.menu_item.price
-        options_price = sum(
-            (option.price for option in self.selected_options.all()),
-            start=Decimal(0)
-        )
+        options_price = sum((option.price for option in self.selected_options.all()),start=Decimal(0))
         return base_price + options_price
 
     @property
     def total_price(self):
-        """
-        এটি একটি CartItem-এর জন্য quantity সহ মোট মূল্য।
-        (এই প্রপার্টিটি sub_total_price গণনার জন্য ব্যবহৃত হয়)
-        """
         return self.add_to_cart_price * self.quantity
 
     def increase_quantity(self, amount: int = 1):
@@ -238,8 +230,7 @@ class CartItem(models.Model):
 
     def decrease_quantity(self, amount: int = 1):
         """
-        কার্ট আইটেমের পরিমাণ কমায়। যদি পরিমাণ শূন্য বা তার কম হয়ে যায়,
-        তাহলে আইটেমটি কার্ট থেকে ডিলিট হয়ে যায়।
+    Decreased the cart quantity if (0 then cart will be deleted automatically)
         """
         if self.quantity <= amount:
             self.delete()

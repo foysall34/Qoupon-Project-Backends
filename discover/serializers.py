@@ -4,8 +4,6 @@ from .models import Restaurant, Cuisine, Diet , CoffeeSubscriptionOffer
 from decimal import Decimal
 
 
-
-
 class CuisineSerializer(serializers.ModelSerializer):
     class Meta:
         model = Cuisine
@@ -220,20 +218,42 @@ class MenuItemSerializer(serializers.ModelSerializer):
 
 
 class MenuCategorySerializer(serializers.ModelSerializer):
-    items = MenuItemSerializer(many=True)
+    items = MenuItemSerializer(many=True, read_only=True)
     user_email = serializers.EmailField(source='user.email', read_only=True, allow_null=True)
+    user_id = serializers.IntegerField(source='user.id', read_only=True)
+    total_price = serializers.SerializerMethodField() 
+
     class Meta:
         model = MenuCategory
-        fields = ['id','user_email', 'name', 'items']
+      
+        fields = ['id', 'user_id', 'user_email', 'name', 'total_price', 'items']
+
+    def get_total_price(self, obj):
+        """
+        এই মেথডটি `total_price` ফিল্ডের মান গণনা করে।
+        obj হলো MenuCategory-এর একটি instance।
+        """
+        total = Decimal('0.00')
+    
+        for item in obj.items.all():
+            # যদি আইটেমটি কার্টে যোগ করা থাকে
+            if item.added_to_cart:
+                total += item.price
+                
+                # আইটেমের অপশনগুলো লুপ করুন
+                for option_group in item.option_title.all():
+                    for option in option_group.options.all():
+                        # যদি অপশনটি সিলেক্ট করা থাকে
+                        if option.is_selected:
+                            total += option.price
+                            
+        return total
 
 
 
 class CartItemSerializer(serializers.ModelSerializer):
-    """ কার্টে থাকা আইটেমগুলো দেখানোর জন্য। """
     menu_item = MenuItemSerializer(read_only=True)
     selected_options = OptionChoiceSerializer(many=True, read_only=True)
-    
-    # মডেলের প্রপার্টিগুলো সরাসরি দেখানোর জন্য
     add_to_cart_price = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
     total_price = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
 
@@ -245,11 +265,8 @@ class CartItemSerializer(serializers.ModelSerializer):
         ]
 
 class AddCartItemSerializer(serializers.ModelSerializer):
-    """ কার্টে নতুন আইটেম যোগ করার জন্য। """
     menu_item_id = serializers.IntegerField(write_only=True)
-    option_ids = serializers.ListField(
-        child=serializers.IntegerField(), required=False, default=[], write_only=True
-    )
+    option_ids = serializers.ListField(child=serializers.IntegerField(), required=False, default=[], write_only=True)
 
     class Meta:
         model = CartItem
@@ -261,20 +278,14 @@ class AddCartItemSerializer(serializers.ModelSerializer):
         menu_item_id = validated_data['menu_item_id']
         quantity = validated_data['quantity']
         option_ids = validated_data['option_ids']
-
-        # TODO: একই আইটেম এবং অপশনসহ থাকলে quantity বাড়ানোর লজিক যোগ করা যেতে পারে।
-        # আপাতত, প্রতিটি অ্যাডে নতুন আইটেম তৈরি হবে।
-        cart_item = CartItem.objects.create(
-            cart=cart, menu_item_id=menu_item_id, quantity=quantity
-        )
+  
+        cart_item = CartItem.objects.create(cart=cart, menu_item_id=menu_item_id, quantity=quantity)
         if option_ids:
             options = OptionChoice.objects.filter(id__in=option_ids)
-            cart_item.selected_options.set(options)
-        
+            cart_item.selected_options.set(options) 
         return cart_item
 
 class UpdateCartItemSerializer(serializers.ModelSerializer):
-    """ শুধুমাত্র কার্ট আইটেমের পরিমাণ আপডেট করার জন্য। """
     class Meta:
         model = CartItem
         fields = ['quantity']

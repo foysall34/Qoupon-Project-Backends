@@ -136,26 +136,17 @@ class VendorSearchListView(generics.ListAPIView):
     search_fields = ['name']
 
 
-# for menu  ***************************************************************************************
+# for menu  -----------------------------------------------------------------------------------------
 
 
-
-
-# 👇👇👇 নিশ্চিত করুন যে আপনার ViewSet-টি এমন দেখাচ্ছে 👇👇👇
 class MenuCategoryViewSet(ModelViewSet):
-    """
-    এই ViewSet-টি মেনু ক্যাটাগরি এবং এর আইটেমগুলো পরিচালনা করে।
-    """
-    # --- এই দুটি লাইন থাকা আবশ্যক ---
-    queryset = MenuCategory.objects.prefetch_related(
-        'items__option_title__options'
-    ).all()
+
+    queryset = MenuCategory.objects.prefetch_related('items__option_title__options').all()
     serializer_class = MenuCategorySerializer
-    # ---------------------------------
+   
 
     @action(detail=True, methods=['patch'], url_path='update-item-selection')
     def update_item_selection(self, request, pk=None):
-        # ... আপনার কাস্টম অ্যাকশনের বাকি কোড ...
         category = self.get_object()
         
         item_id = request.data.get('item_id')
@@ -188,7 +179,6 @@ class MenuCategoryViewSet(ModelViewSet):
 
 class CartViewSet(RetrieveModelMixin, UpdateModelMixin, GenericViewSet):
     """
-    ব্যবহারকারীর কার্ট দেখা এবং ডেলিভারি টাইপ আপডেট করার জন্য একটি এন্ডপয়েন্ট।
     GET /api/cart/
     PATCH /api/cart/
     """
@@ -196,26 +186,19 @@ class CartViewSet(RetrieveModelMixin, UpdateModelMixin, GenericViewSet):
     permission_classes = [IsAuthenticated]
 
     def get_object(self):
-        """ বর্তমান ব্যবহারকারীর জন্য কার্ট অবজেক্ট খুঁজে বের করে বা তৈরি করে। """
         cart, created = Cart.objects.get_or_create(user=self.request.user)
         return cart
 
     def list(self, request, *args, **kwargs):
-        """ GET রিকোয়েস্টের জন্য retrieve মেথড কল করে। """
         return self.retrieve(request, *args, **kwargs)
 
 class CartItemViewSet(ModelViewSet):
-    """
-    কার্টে আইটেম যোগ, আপডেট, ডিলিট এবং পরিমাণ পরিবর্তন করার জন্য একটি এন্ডপয়েন্ট।
-    """
     http_method_names = ['get', 'post', 'patch', 'delete']
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
         """ শুধুমাত্র বর্তমান ব্যবহারকারীর কার্টের আইটেমগুলো রিটার্ন করে। """
-        return CartItem.objects.filter(
-            cart__user=self.request.user
-        ).select_related('menu_item').prefetch_related('selected_options')
+        return CartItem.objects.filter(cart__user=self.request.user).select_related('menu_item').prefetch_related('selected_options')
 
     def get_serializer_class(self):
         if self.request.method == 'POST':

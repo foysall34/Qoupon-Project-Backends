@@ -18,7 +18,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from django.shortcuts import get_object_or_404
-from django.db import transaction # অ্যাটমিক অপারেশনের জন্য
+from django.db import transaction
 from .models import Shop, BusinessHours
 from .serializers import BusinessHoursSerializer
 
@@ -44,7 +44,6 @@ class RecentSearchView(generics.ListAPIView):
     permission_classes = [AllowAny]
 
     def get_queryset(self):
-        # ধাপ ১: ইউজারের সব সার্চ সবচেয়ে নতুন থেকে পুরনো ক্রমে সাজানো হলো
         all_user_searches = SearchQuery.objects.filter(user=self.request.user).order_by('-created_at')
 
         unique_recent_searches = []
@@ -67,7 +66,6 @@ class FrequentSearchView(views.APIView):
     permission_classes = [AllowAny]
     
     def get(self, request, *args, **kwargs):
-        # একই query_text গ্রুপ করে search_count যোগ করা হচ্ছে
         frequent_queries = SearchQuery.objects.values('query_text').annotate(
             total_searches=Sum('search_count')
         ).order_by('-total_searches')[:10] 
@@ -101,27 +99,19 @@ class ShopFilterView(generics.ListAPIView):
     permission_classes = [AllowAny]
     queryset = Shop.objects.all()
     serializer_class = ShopSerializer
-    
     filter_backends = [DjangoFilterBackend, OrderingFilter]
-    
-    # filterset_fields এর পরিবর্তে filterset_class ব্যবহার করুন
     filterset_class = ShopFilter
     
     ordering_fields = ['rating', 'delivery_time_minutes', 'delivery_fee']
 
 
     def list(self, request, *args, **kwargs):
-        # প্রথমে ডিফল্ট ফিল্টারিং চালিয়ে কোয়েরিসেটটি নিন
         queryset = self.filter_queryset(self.get_queryset())
-
-       
         if 'category_name' in request.query_params and not queryset.exists():
             return Response(
                 {"detail": "Sorry,,This Category not found"}, 
                 status=status.HTTP_404_NOT_FOUND
             )
-        
-
         page = self.paginate_queryset(queryset)
         if page is not None:
             serializer = self.get_serializer(page, many=True)
@@ -133,18 +123,10 @@ class ShopFilterView(generics.ListAPIView):
 
 
 class BusinessHoursView(APIView):
-    # এখানে পারমিশন ক্লাস যোগ করতে পারেন, যেমন IsAuthenticated
-    # permission_classes = [IsAuthenticated]
-
     def get(self, request, shop_id):
-        """ একটি শপের বর্তমান সময়সূচি রিটার্ন করে। """
         shop = get_object_or_404(Shop, id=shop_id)
-        
-        # সপ্তাহের সব দিনের জন্য ডেটা তৈরি করুন, এমনকি যদি সেট করা না থাকে
         all_hours = []
-        days_of_week = [0, 1, 2, 3, 4, 5, 6] # Mon to Sun
-        
-        # ডেটাবেস থেকে vorhandene সময়সূচি আনুন
+        days_of_week = [0, 1, 2, 3, 4, 5, 6] 
         existing_hours = {bh.day: bh for bh in shop.business_hours.all()}
         
         for day in days_of_week:
@@ -152,12 +134,11 @@ class BusinessHoursView(APIView):
                 serializer = BusinessHoursSerializer(existing_hours[day])
                 all_hours.append(serializer.data)
             else:
-                # যদি ডেটা সেট করা না থাকে, তাহলে ডিফল্ট মান দিন
                 all_hours.append({
                     "day": day,
                     "open_time": None,
                     "close_time": None,
-                    "is_closed": True # ডিফল্টভাবে বন্ধ
+                    "is_closed": True 
                 })
                 
         return Response(all_hours, status=status.HTTP_200_OK)
@@ -166,8 +147,6 @@ class BusinessHoursView(APIView):
         """ একটি শপের জন্য সপ্তাহের সাত দিনের সময়সূচি সেভ/আপডেট করে। """
         shop = get_object_or_404(Shop, id=shop_id)
         hours_data = request.data
-        
-        # নিশ্চিত করুন যে ডেটা একটি লিস্ট
         if not isinstance(hours_data, list):
             return Response({"error": "Request data must be a list of business hours."}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -175,7 +154,6 @@ class BusinessHoursView(APIView):
         if serializer.is_valid():
             try:
                 with transaction.atomic():
-                    # লুপ করে প্রতিটি দিনের জন্য ডেটা সেভ বা আপডেট করুন
                     for item in serializer.validated_data:
                         BusinessHours.objects.update_or_create(
                             shop=shop,

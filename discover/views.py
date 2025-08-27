@@ -197,7 +197,6 @@ class CartItemViewSet(ModelViewSet):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        """ শুধুমাত্র বর্তমান ব্যবহারকারীর কার্টের আইটেমগুলো রিটার্ন করে। """
         return CartItem.objects.filter(cart__user=self.request.user).select_related('menu_item').prefetch_related('selected_options')
 
     def get_serializer_class(self):
@@ -208,7 +207,6 @@ class CartItemViewSet(ModelViewSet):
         return CartItemSerializer
 
     def get_serializer_context(self):
-        """ সিরিয়ালাইজারকে কার্ট অবজেক্ট পাস করে। """
         cart, created = Cart.objects.get_or_create(user=self.request.user)
         return {'cart': cart, 'request': self.request}
 
@@ -224,7 +222,7 @@ class CartItemViewSet(ModelViewSet):
         """ একটি নির্দিষ্ট কার্ট আইটেমের পরিমাণ ১ কমায়। """
         cart_item = self.get_object()
         cart_item.decrease_quantity()
-        # যদি আইটেম ডিলিট হয়ে যায়, তাহলে 204 No Content পাঠানো যেতে পারে
+    
         if not CartItem.objects.filter(pk=pk).exists():
             return Response({'status': 'item removed'}, status=status.HTTP_204_NO_CONTENT)
         return Response({'status': 'quantity decreased'}, status=status.HTTP_200_OK)

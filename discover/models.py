@@ -166,6 +166,7 @@ class OptionGroup(models.Model):
 class OptionChoice(models.Model):
     group = models.ForeignKey(OptionGroup, related_name='options', on_delete=models.CASCADE)
     name = models.CharField(max_length=100)
+    selected_title = models.CharField(max_length=200 , default='write title')
     price = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
     is_selected = models.BooleanField(default=False)
 

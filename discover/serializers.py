@@ -188,7 +188,7 @@ from .models import (
 class OptionChoiceSerializer(serializers.ModelSerializer):
     class Meta:
         model = OptionChoice
-        fields = ['id', 'name', 'price', 'is_selected']
+        fields = ['id', 'name', 'selected_title', 'price', 'is_selected']
 
 class OptionGroupSerializer(serializers.ModelSerializer):
     options = OptionChoiceSerializer(many=True)
@@ -199,16 +199,31 @@ class OptionGroupSerializer(serializers.ModelSerializer):
 class MenuItemSerializer(serializers.ModelSerializer):
     option_title = OptionGroupSerializer(many=True)
     image_url = serializers.SerializerMethodField()
+    total_price = serializers.SerializerMethodField()
+
     class Meta:
         model = MenuItem
         fields = [
             'id', 'name', 'description', 'price', 'calories', 
-            'image','image_url', 'added_to_cart', 'option_title'
+            'image','image_url', 'added_to_cart','total_price', 'option_title'
         ]
-
         extra_kwargs = {
             'image': {'write_only': True}
         }
+
+
+    def get_total_price(self, obj):
+        total = Decimal(obj.price)
+        for option_group in obj.option_title.all():
+            for option in option_group.options.all():
+                if option.is_selected:
+                    total += option.price
+                    
+        return total
+    
+    
+    
+
     def get_image_url(self, obj):
         
         if obj.image:
@@ -221,33 +236,14 @@ class MenuCategorySerializer(serializers.ModelSerializer):
     items = MenuItemSerializer(many=True, read_only=True)
     user_email = serializers.EmailField(source='user.email', read_only=True, allow_null=True)
     user_id = serializers.IntegerField(source='user.id', read_only=True)
-    total_price = serializers.SerializerMethodField() 
+   
 
     class Meta:
         model = MenuCategory
       
-        fields = ['id', 'user_id', 'user_email', 'name', 'total_price', 'items']
+        fields = ['id', 'user_id', 'user_email', 'name',  'items']
 
-    def get_total_price(self, obj):
-        """
-        এই মেথডটি `total_price` ফিল্ডের মান গণনা করে।
-        obj হলো MenuCategory-এর একটি instance।
-        """
-        total = Decimal('0.00')
-    
-        for item in obj.items.all():
-            # যদি আইটেমটি কার্টে যোগ করা থাকে
-            if item.added_to_cart:
-                total += item.price
-                
-                # আইটেমের অপশনগুলো লুপ করুন
-                for option_group in item.option_title.all():
-                    for option in option_group.options.all():
-                        # যদি অপশনটি সিলেক্ট করা থাকে
-                        if option.is_selected:
-                            total += option.price
-                            
-        return total
+  
 
 
 
@@ -255,14 +251,15 @@ class CartItemSerializer(serializers.ModelSerializer):
     menu_item = MenuItemSerializer(read_only=True)
     selected_options = OptionChoiceSerializer(many=True, read_only=True)
     add_to_cart_price = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
-    total_price = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+   
 
     class Meta:
         model = CartItem
         fields = [
             'id', 'menu_item', 'quantity', 'selected_options', 
-            'add_to_cart_price', 'total_price'
+            'add_to_cart_price'
         ]
+
 
 class AddCartItemSerializer(serializers.ModelSerializer):
     menu_item_id = serializers.IntegerField(write_only=True)

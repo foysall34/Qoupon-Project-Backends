@@ -40,6 +40,7 @@ INSTALLED_APPS = [
     'food',
     'homepage',
     'discover',
+    'vendors',
     # 3rd party
     'rest_framework',
     'cloudinary_storage', 

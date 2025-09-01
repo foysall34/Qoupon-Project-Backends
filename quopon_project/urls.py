@@ -6,5 +6,6 @@ urlpatterns = [
     path('auth/', include('accounts.urls')), 
     path('food/', include('food.urls')), 
     path('home/' , include('homepage.urls')),
-    path('discover/' , include('discover.urls'))
+    path('discover/' , include('discover.urls')),
+    path('vendors/' ,  include('vendors.urls'))
 ]

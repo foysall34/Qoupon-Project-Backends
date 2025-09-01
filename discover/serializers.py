@@ -156,6 +156,7 @@ class FollowedVendorSerializer(serializers.ModelSerializer):
         model = VendorFollowed
         fields = [
             'id',
+            'menu_category',
             'title',
             'category',
             'logo',

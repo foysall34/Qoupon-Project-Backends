@@ -9,7 +9,8 @@ from django.db import models
 from django.conf import settings
 from decimal import Decimal
 from cloudinary.models import CloudinaryField
-
+import random
+import string
 
 class Cuisine(models.Model):
     name = models.CharField(max_length=100, unique=True)
@@ -86,9 +87,19 @@ class OrderType(models.TextChoices):
     DELIVERY = 'delivery', 'Delivery'
     PICKUP = 'pickup', 'Pickup'
 
+def generate_order_id():
+    length = 8
+  
+    chars = string.ascii_uppercase + string.digits
+    while True:
+        order_id = ''.join(random.choices(chars, k=length))
+        if not Order.objects.filter(order_id=order_id).exists():
+            break
+    return order_id
+
 class Order(models.Model):
     user = models.ForeignKey(settings.AUTH_USER_MODEL , on_delete=models.CASCADE, related_name='orders')
-    order_id = models.CharField(max_length=100, unique=True)
+    order_id = models.CharField(max_length=100, unique=True , blank= True)
     product_name = models.CharField(max_length=255)
     product_image = CloudinaryField('image')
     price = models.DecimalField(max_digits=10, decimal_places=2)
@@ -104,23 +115,19 @@ class Order(models.Model):
     )
     created_at = models.DateTimeField(auto_now_add=True)
 
+
+    def save(self, *args, **kwargs):
+        if not self.order_id:
+            self.order_id = generate_order_id()
+        super().save(*args, **kwargs)
+
+
     def __str__(self):
         return f"{self.order_id} - {self.product_name}"
     
 
 
 
-class VendorFollowed(models.Model):
-    title = models.CharField(max_length=200 , default='title' , blank= True, null= True)
-    logo = CloudinaryField('image')
-    category = models.CharField(max_length=100)
-    descriptions = models.CharField(max_length=200)
-    expiry_date = models.DateTimeField(default=timezone.now)
-    is_followed = models.BooleanField(default=False)
-    
-
-    def __str__(self):
-        return self.category
 
 
 
@@ -128,7 +135,7 @@ class VendorFollowed(models.Model):
 
 User = settings.AUTH_USER_MODEL
 
-# Menu + add to cart  ***************************************************************************************************
+# ------------------------- Menu + add to cart  ---------------------------
 
 class MenuCategory(models.Model):
     name = models.CharField(max_length=100, unique=True , null=True)
@@ -248,4 +255,15 @@ class CartItem(models.Model):
 
    
 
-  
+class VendorFollowed(models.Model):
+    menu_category = models.ForeignKey(MenuCategory,on_delete=models.CASCADE, related_name='vendors')
+    title = models.CharField(max_length=200 , default='title' , blank= True, null= True)
+    logo = CloudinaryField('image')
+    category = models.CharField(max_length=100)
+    descriptions = models.CharField(max_length=200)
+    expiry_date = models.DateTimeField(default=timezone.now)
+    is_followed = models.BooleanField(default=False)
+    
+
+    def __str__(self):
+        return self.category

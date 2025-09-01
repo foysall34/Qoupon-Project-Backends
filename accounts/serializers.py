@@ -32,7 +32,7 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
        
         data = super().validate(attrs)
 
-        
+        data['id'] = self.user.id
         data['success'] = True
         data['message'] = "Login Successful!"
         data['email'] = self.user.email

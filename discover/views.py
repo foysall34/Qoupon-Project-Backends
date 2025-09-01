@@ -136,23 +136,57 @@ class VendorSearchListView(generics.ListAPIView):
     search_fields = ['name']
 
 
-# for menu  -----------------------------------------------------------------------------------------
+# -----------------------------for menu  ----------------------------------------
 
 
-class MenuCategoryViewSet(ModelViewSet):
+class MenuCategoryListAPIView(APIView):
+    """
+    একটি নির্দিষ্ট ব্যবহারকারীর জন্য সমস্ত MenuCategory তালিকাভুক্ত করে।
+    """
+    def get(self, request, user_id, format=None):
+        # URL থেকে user_id নিয়ে সেই ব্যবহারকারীর জন্য MenuCategory ফিল্টার করে
+        categories = MenuCategory.objects.filter(user_id=user_id).prefetch_related('items__option_title__options')
+        serializer = MenuCategorySerializer(categories, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
-    queryset = MenuCategory.objects.prefetch_related('items__option_title__options').all()
-    serializer_class = MenuCategorySerializer
-   
+# --- দ্বিতীয় ভিউ: একটি নির্দিষ্ট ক্যাটাগরি এবং তার আইটেম আপডেট করার জন্য ---
+class MenuCategoryDetailAPIView(APIView):
+    """
+    একটি নির্দিষ্ট MenuCategory অবজেক্টের বিস্তারিত তথ্য প্রদান এবং আইটেম আপডেট করে।
+    """
+    def get_object(self, user_id, pk):
+        """
+        ডাটাবেস থেকে একটি নির্দিষ্ট MenuCategory অবজেক্ট খুঁজে বের করে।
+        """
+        try:
+            # user_id এবং pk উভয় দিয়েই ফিল্টার করা হচ্ছে নিরাপত্তার জন্য
+            return MenuCategory.objects.get(user_id=user_id, pk=pk)
+        except MenuCategory.DoesNotExist:
+            raise Http404
 
-    @action(detail=True, methods=['patch'], url_path='update-item-selection')
-    def update_item_selection(self, request, pk=None):
-        category = self.get_object()
+    def get(self, request, user_id, pk, format=None):
+        """
+        একটি নির্দিষ্ট MenuCategory-এর বিস্তারিত তথ্য দেখায়।
+        """
+        category = self.get_object(user_id, pk)
+        serializer = MenuCategorySerializer(category)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    def patch(self, request, user_id, pk, format=None):
+        """
+        'update-item-selection' এর কার্যকারিতা এখানে প্রয়োগ করা হয়েছে।
+        এটি একটি MenuItem-এর 'added_to_cart' অথবা একটি OptionChoice-এর 'is_selected' স্ট্যাটাস আপডেট করে।
+        """
+        category = self.get_object(user_id, pk)
         
         item_id = request.data.get('item_id')
         option_id = request.data.get('option_id')
         add_to_cart_value = request.data.get('added_to_cart')
         is_selected_value = request.data.get('is_selected')
+
+        # item_id এবং অন্যান্য প্রয়োজনীয় ডেটা অনুরোধে আছে কিনা তা পরীক্ষা করুন
+        if not item_id:
+            return Response({"error": "item_id is required."}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
             menu_item = MenuItem.objects.get(id=item_id, category=category)
@@ -165,6 +199,7 @@ class MenuCategoryViewSet(ModelViewSet):
 
         if option_id is not None and is_selected_value is not None:
             try:
+                # নিশ্চিত করুন যে অপশনটি এই আইটেমের অন্তর্গত
                 valid_option_groups = OptionGroup.objects.filter(item=menu_item)
                 option = OptionChoice.objects.get(id=option_id, group__in=valid_option_groups)
                 option.is_selected = is_selected_value
@@ -172,8 +207,9 @@ class MenuCategoryViewSet(ModelViewSet):
             except OptionChoice.DoesNotExist:
                 return Response({"error": f"OptionChoice with id {option_id} not found for this item."}, status=status.HTTP_404_NOT_FOUND)
 
-        refreshed_category = MenuCategory.objects.get(id=pk)
-        serializer = self.get_serializer(refreshed_category)
+        # সফলভাবে আপডেট করার পর, ক্যাটাগরির সর্বশেষ অবস্থা রিটার্ন করুন
+        refreshed_category = self.get_object(user_id, pk)
+        serializer = MenuCategorySerializer(refreshed_category)
         return Response(serializer.data, status=status.HTTP_200_OK)
     
 
@@ -226,3 +262,85 @@ class CartItemViewSet(ModelViewSet):
         if not CartItem.objects.filter(pk=pk).exists():
             return Response({'status': 'item removed'}, status=status.HTTP_204_NO_CONTENT)
         return Response({'status': 'quantity decreased'}, status=status.HTTP_200_OK)
+    
+
+
+# ---------------------For Mollie Payment gateway ------------------------------
+# discover/views.py
+
+# discover/views.py
+
+import logging
+from django.conf import settings
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
+from mollie.api.client import Client
+from mollie.api.error import UnprocessableEntityError, Error as MollieApiError
+
+logger = logging.getLogger(__name__)
+
+class CreatePaymentView(APIView):
+    """
+    Mollie-এর মাধ্যমে একটি পেমেন্ট তৈরি করার জন্য একটি API ভিউ।
+    """
+    def post(self, request, *args, **kwargs):
+        try:
+            mollie_client = Client()
+            mollie_client.set_api_key(settings.MOLLIE_API_KEY)
+        except Exception as e:
+            logger.error(f"Mollie API কী লোড করতে ব্যর্থ: {e}")
+            return Response(
+                {'error': 'পেমেন্ট সিস্টেম কনফিগারেশনে সমস্যা হয়েছে।'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+        amount = request.data.get('amount')
+        description = request.data.get('description')
+
+        if amount is None:
+            return Response({'error': 'Amount is a required field.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            formatted_amount = f"{float(amount):.2f}"
+        except (ValueError, TypeError):
+            return Response({'error': 'Invalid amount provided. Please send a valid number.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        payment_data = {
+            'amount': {'currency': 'EUR', 'value': formatted_amount},
+            'description': description or 'Qoupon Project Payment',
+            'redirectUrl': 'https://your-frontend-app.com/payment-success/',
+            'webhookUrl': 'https://your-backend-domain.com/discover/mollie-webhook/',
+        }
+
+        try:
+            # Mollie API ব্যবহার করে পেমেন্ট তৈরি করুন
+            payment = mollie_client.payments.create(payment_data)
+
+            # --- আসল সমাধান এখানে ---
+            # payment.checkout_url ব্যবহার করুন, এটি সবচেয়ে নিরাপদ
+            checkout_url = payment.checkout_url
+
+            # সফলভাবে পেমেন্ট তৈরি হলে চেকআউট URL রিটার্ন করুন
+            return Response(
+                {'checkout_url': checkout_url},
+                status=status.HTTP_201_CREATED
+            )
+
+        except UnprocessableEntityError as e:
+            logger.error(f"Mollie UnprocessableEntityError: {e}")
+            return Response({'error': f'Payment data is invalid. Details: {e.detail}'}, status=status.HTTP_422_UNPROCESSABLE_ENTITY)
+
+        except MollieApiError as e:
+            logger.error(f"Mollie API Error: {e}")
+            return Response({'error': 'Could not connect to the payment provider. Please check API key or network.'}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+
+        except Exception as e:
+            # --- বিস্তারিত লগিং যোগ করা হয়েছে ---
+            # এই লগটি আপনাকে টার্মিনালে আসল এরর দেখাবে
+            logger.error(f"An unexpected error occurred after payment creation: {e}", exc_info=True)
+            return Response(
+                {'error': 'An unexpected error occurred. Please try again later.'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+

@@ -144,9 +144,9 @@ class BusinessHoursView(APIView):
         return Response(all_hours, status=status.HTTP_200_OK)
 
     def post(self, request, shop_id):
-        """ একটি শপের জন্য সপ্তাহের সাত দিনের সময়সূচি সেভ/আপডেট করে। """
         shop = get_object_or_404(Shop, id=shop_id)
         hours_data = request.data
+        print(hours_data)
         if not isinstance(hours_data, list):
             return Response({"error": "Request data must be a list of business hours."}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -165,6 +165,38 @@ class BusinessHoursView(APIView):
                             }
                         )
                 return Response({"message": "Business hours updated successfully."}, status=status.HTTP_200_OK)
+            except Exception as e:
+                return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        else:
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        
+    def patch(self, request, shop_id):
+        """
+        একটি শপের জন্য Business Hours আংশিকভাবে আপডেট করে।
+        শুধুমাত্র রিকোয়েস্টে পাঠানো দিনগুলোর তথ্য পরিবর্তন করে।
+        """
+        shop = get_object_or_404(Shop, id=shop_id)
+        hours_data = request.data
+        
+
+        if not isinstance(hours_data, list):
+            return Response({"error": "Request data must be a list of business hours."}, status=status.HTTP_400_BAD_REQUEST)
+
+        serializer = BusinessHoursSerializer(data=hours_data, many=True)
+        if serializer.is_valid():
+            try:
+                with transaction.atomic():
+                    for item in serializer.validated_data:
+                        BusinessHours.objects.update_or_create(
+                            shop=shop,
+                            day=item['day'],
+                            defaults={
+                                'open_time': item.get('open_time'),
+                                'close_time': item.get('close_time'),
+                                'is_closed': item.get('is_closed', False)
+                            }
+                        )
+                return Response({"message": "Business hours partially updated successfully."}, status=status.HTTP_200_OK)
             except Exception as e:
                 return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         else:

@@ -1,5 +1,5 @@
 from django.urls import path
-from .views import  VendorSearchListView, OrderListView,RestaurantListView , OfferDetailView , FavoriteOffersListView , FavoriteToggleView , PretCoffeeSubscriptionAPIView
+from .views import  CreatePaymentView,MenuCategoryDetailAPIView,MenuCategoryListAPIView,VendorSearchListView, OrderListView,RestaurantListView , OfferDetailView , FavoriteOffersListView , FavoriteToggleView , PretCoffeeSubscriptionAPIView
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from . import views
@@ -7,7 +7,7 @@ from . import views
 
 router = DefaultRouter()
 
-router.register(r'menu', views.MenuCategoryViewSet, basename='menu')
+
 router.register(r'cart-items', views.CartItemViewSet, basename='cart-item')
 
 
@@ -21,6 +21,11 @@ urlpatterns = [
     path('my-orders/', OrderListView.as_view(), name='my-order-list'),
     path('followed-vendors/', VendorSearchListView.as_view(), name='followed-vendor-list'),
     path('cart/',views.CartViewSet.as_view({'get': 'retrieve', 'patch': 'update', 'put': 'update'}),name='cart-detail' ),
+    path('menu/<int:user_id>/name/', MenuCategoryListAPIView.as_view(), name='user-category-list'),
+    
+    path('menu/<int:user_id>/categories/<int:pk>/', MenuCategoryDetailAPIView.as_view(), name='user-category-detail'),
+    # payment gateway 
+    path('payment/'  , CreatePaymentView.as_view() , name= 'mollie-payment'),
 
     path('', include(router.urls)),
    

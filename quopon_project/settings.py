@@ -58,9 +58,10 @@ cloudinary.config(
   api_key = config("CLOUD_API_KEY"), 
   api_secret = config("CLOUD_API_SECRET"),
   secure = config("SECURE") 
+
   
 )
-# ডিফল্ট ফাইল স্টোরেজ হিসেবে Cloudinary সেট করা হচ্ছে
+
 DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
 
 
@@ -161,7 +162,7 @@ EMAIL_PORT = config('EMAIL_PORT', cast=int)
 EMAIL_USE_TLS = config('EMAIL_USE_TLS', cast=bool)
 EMAIL_HOST_USER = config('EMAIL_HOST_USER')
 EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD')
-
+MOLLIE_API_KEY = config("MOLLIE_API_KEY")
 
 ROOT_URLCONF = 'quopon_project.urls'
 

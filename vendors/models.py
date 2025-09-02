@@ -17,7 +17,7 @@ class Business_profile(models.Model):
     kvk_number = models.CharField(max_length=50, unique=True, verbose_name="KVK Number")
     phone_number = models.CharField(max_length=20, verbose_name="Phone Number")
     address = models.TextField(verbose_name="Store Address")
-    category = models.ForeignKey(Business_profile_Category, on_delete=models.SET_NULL, null=True, blank=True)
+    category = models.ForeignKey(Business_profile_Category, on_delete=models.CASCADE )
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):

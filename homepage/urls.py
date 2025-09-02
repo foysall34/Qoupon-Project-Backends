@@ -6,8 +6,9 @@ from .views import (
     RecentSearchView,
     FrequentSearchView,
     ShopFilterView,
+    UserBusinessHoursAPIView
 )
-from .views import ShopBusinessHoursAPIView 
+
 urlpatterns = [
 
     path('categories/', CategoryListView.as_view(), name='category-list'),
@@ -23,5 +24,5 @@ urlpatterns = [
    
 
     path('shops/near-you/', ShopFilterView.as_view(), name='shops-near-you'),
-    path('shops/<int:shop_id>/business-hours/', ShopBusinessHoursAPIView.as_view(), name='shop-business-hours'),
+    path('users/<int:user_id>/business-hours/', UserBusinessHoursAPIView.as_view(), name='shop-business-hours'),
 ]

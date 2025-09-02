@@ -27,6 +27,7 @@ class Business_profile_Serializer(serializers.ModelSerializer):
             'address',
             'category'
         ]
+        
         extra_kwargs = {
             
             'logo': {'write_only': True},

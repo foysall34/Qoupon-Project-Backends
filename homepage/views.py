@@ -14,13 +14,7 @@ from .serializers import (
     FrequentSearchSerializer,
   
 )
-from rest_framework.views import APIView
-from rest_framework.response import Response
-from rest_framework import status
-from django.shortcuts import get_object_or_404
-from django.db import transaction
-from .models import Shop, BusinessHours
-from .serializers import BusinessHoursSerializer,BusinessHoursCreateUpdateSerializer
+
 
 
 
@@ -124,29 +118,34 @@ class ShopFilterView(generics.ListAPIView):
 
 # your_app_name/views.py
 
+# home/views.py
+
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
+from .models import BusinessHours
+from .serializers import BusinessHoursSerializer # আপনার Serializer অপরিবর্তিত থাকতে পারে
 from django.shortcuts import get_object_or_404
-from .models import BusinessHours, Shop
-from .serializers import BusinessHoursSerializer, BusinessHoursCreateUpdateSerializer
+from django.contrib.auth import get_user_model 
 
-class ShopBusinessHoursAPIView(APIView):
+User = get_user_model()
+
+class UserBusinessHoursAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
-    def get(self, request, shop_id, *args, **kwargs):
+    def get(self, request, user_id, *args, **kwargs):
         """
-        GET Method: একটি দোকানের ৭ দিনের সময়সূচীর সাথে user এবং shop-এর তথ্যসহ রিটার্ন করে।
+        GET Method: নির্দিষ্ট user_id-এর জন্য ৭ দিনের ব্যবসার সময়সূচী রিটার্ন করে।
         """
-        # প্রথমে শপটি খুঁজে বের করা হচ্ছে এবং নিশ্চিত করা হচ্ছে যে এটি বর্তমান ইউজারেরই শপ।
-        shop = get_object_or_404(Shop, id=shop_id, user=request.user)
-        # শপের সাথে সম্পর্কিত ইউজার অবজেক্টটি নিয়ে নেওয়া হচ্ছে।
-        user = shop.user
-
-        # ৭ দিনের সময়সূচী তৈরির আগের লজিকটি অপরিবর্তিত থাকবে।
-        queryset = BusinessHours.objects.filter(shop=shop)
+        # URL থেকে প্রাপ্ত user_id দিয়ে ব্যবহারকারীকে খুঁজে বের করা হচ্ছে
+        # যদি ব্যবহারকারীকে খুঁজে না পাওয়া যায়, তাহলে 404 এরর দেবে
+        user = get_object_or_404(User, id=user_id)
+        
+        # বাকি লজিক আগের মতোই থাকবে
+        queryset = BusinessHours.objects.filter(user=user)
         existing_hours_map = {bh.day: bh for bh in queryset}
+        
         full_schedule_list = []
 
         for day_index, day_name in BusinessHours.DayOfWeek.choices:
@@ -155,48 +154,61 @@ class ShopBusinessHoursAPIView(APIView):
                 full_schedule_list.append(serializer.data)
             else:
                 full_schedule_list.append({
-                    "id": None,
+              
                     "day": day_name,
-                    "open_time": None,
-                    "close_time": None,
-                    "is_closed": True
+                    "open_time": "00:00:00",
+                    "close_time": "23:59:00",
+                    "is_closed": False
                 })
 
-        # ===> মূল পরিবর্তনটি এখানে <===
-        # আমরা এখন একটি নতুন ডিকশনারি তৈরি করছি যা চূড়ান্ত রেসপন্স হিসেবে পাঠানো হবে।
         response_data = {
             'user_id': user.id,
-            'user_email': user.email, # Django-এর ডিফল্ট User মডেলে 'email' ফিল্ড থাকে
-            'shop_id': shop.id,
-            'schedule': full_schedule_list # ৭ দিনের তালিকাটি 'schedule' কী-এর ভেতরে রাখা হচ্ছে
+            'user_email': user.email,
+            'schedule': full_schedule_list
         }
 
         return Response(response_data, status=status.HTTP_200_OK)
 
-    # POST এবং PATCH মেথড দুটি অপরিবর্তিত থাকবে
-    def post(self, request, shop_id, *args, **kwargs):
-        # ... কোনো পরিবর্তন নেই ...
+    def post(self, request, *args, **kwargs):
+        """
+        POST/PATCH Method: ব্যবহারকারীর জন্য ব্যবসার সময়সূচী তৈরি বা আপডেট করে।
+        """
         data = request.data
         if not isinstance(data, list):
-            return Response({"detail": "Request body must be a list."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"detail": "Request body must be a list of schedule items."}, status=status.HTTP_400_BAD_REQUEST)
 
-        shop = get_object_or_404(Shop, id=shop_id, user=request.user)
-        
+        user = request.user
         response_data, error_data = [], []
+
         for item in data:
             day = item.get('day')
-            instance, _ = BusinessHours.objects.get_or_create(shop=shop, day=day, defaults={'user': request.user})
+            if day is None:
+                error_data.append({'item': item, 'errors': 'Day is required.'})
+                continue
             
-            serializer = BusinessHoursCreateUpdateSerializer(instance, data=item, context={'request': request})
+            # get_or_create এখন user এবং day ব্যবহার করে কাজ করবে।
+            instance, created = BusinessHours.objects.get_or_create(user=user, day=day)
+            
+            # আপনার Serializer ব্যবহার করে ডেটা ভ্যালিডেট এবং সেভ করা হচ্ছে।
+            # BusinessHoursCreateUpdateSerializer বা আপনার ব্যবহৃত যেকোনো Serializer।
+            serializer = BusinessHoursSerializer(instance, data=item, context={'request': request})
+            
             if serializer.is_valid():
-                serializer.save(shop=shop)
+                # serializer.save() করার সময় user অটোমেটিক पास করার দরকার নেই যদি serializer সঠিকভাবে হ্যান্ডেল করে।
+                # তবে নিশ্চিত করার জন্য user=user পাস করা ভালো।
+                serializer.save(user=user)
                 response_data.append(serializer.data)
             else:
                 error_data.append({'day': day, 'errors': serializer.errors})
 
         if error_data:
             return Response(error_data, status=status.HTTP_400_BAD_REQUEST)
-        return Response(response_data, status=status.HTTP_200_OK)
+        
+        return Response(response_data, status=status.HTTP_201_CREATED)
 
-    def patch(self, request, shop_id, *args, **kwargs):
-        return self.post(request, shop_id, *args, **kwargs)
+    def patch(self, request, *args, **kwargs):
+        # PATCH রিকোয়েস্টকেও POST মেথডের মতোই হ্যান্ডেল করা হচ্ছে।
+        return self.post(request, *args, **kwargs)
+
+
+

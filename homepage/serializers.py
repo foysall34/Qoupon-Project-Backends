@@ -1,6 +1,11 @@
 from rest_framework import serializers
 from .models import Category, Shop, SearchQuery , BusinessHours
 from django.utils import timezone
+from django.contrib.auth import get_user_model
+
+User = get_user_model()
+
+
 
 class CategorySerializer(serializers.ModelSerializer):
   
@@ -108,10 +113,29 @@ class ShopSerializer(serializers.ModelSerializer):
 
 
 class BusinessHoursSerializer(serializers.ModelSerializer):
+  
+    day = serializers.CharField(source='get_day_display')
+    
     class Meta:
         model = BusinessHours
-        # shop ফিল্ডটি আমরা URL থেকে নেব, তাই এখানে রাখছি না
-        fields = ['day', 'open_time', 'close_time', 'is_closed']
+        fields = [ 'day', 'open_time', 'close_time', 'is_closed']
+
+class BusinessHoursCreateUpdateSerializer(serializers.ModelSerializer):
+    user = serializers.HiddenField(default=serializers.CurrentUserDefault())
+
+    class Meta:
+        model = BusinessHours
+        fields = [ 'user', 'shop', 'day', 'open_time', 'close_time', 'is_closed']
+        read_only_fields = ['shop'] # shop ফিল্ডটি URL থেকে আসবে, বডি থেকে নয়
+
+    def validate(self, data):
+        is_closed = data.get('is_closed', False)
+        if not is_closed and (data.get('open_time') is None or data.get('close_time') is None):
+            raise serializers.ValidationError("If the shop is not closed, open and close times are required.")
+        if is_closed:
+            data['open_time'] = None
+            data['close_time'] = None
+        return data
 
 
 class RecentSearchSerializer(serializers.ModelSerializer):

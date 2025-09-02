@@ -8,7 +8,7 @@ from decimal import Decimal
 from django.db import models
 from django.conf import settings
 from decimal import Decimal
-from cloudinary.models import CloudinaryField
+
 import random
 import string
 

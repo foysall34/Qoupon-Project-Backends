@@ -20,7 +20,7 @@ from rest_framework import status
 from django.shortcuts import get_object_or_404
 from django.db import transaction
 from .models import Shop, BusinessHours
-from .serializers import BusinessHoursSerializer
+from .serializers import BusinessHoursSerializer,BusinessHoursCreateUpdateSerializer
 
 
 
@@ -122,82 +122,81 @@ class ShopFilterView(generics.ListAPIView):
     
 
 
-class BusinessHoursView(APIView):
-    def get(self, request, shop_id):
-        shop = get_object_or_404(Shop, id=shop_id)
-        all_hours = []
-        days_of_week = [0, 1, 2, 3, 4, 5, 6] 
-        existing_hours = {bh.day: bh for bh in shop.business_hours.all()}
-        
-        for day in days_of_week:
-            if day in existing_hours:
-                serializer = BusinessHoursSerializer(existing_hours[day])
-                all_hours.append(serializer.data)
+# your_app_name/views.py
+
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
+from rest_framework.permissions import IsAuthenticated
+from django.shortcuts import get_object_or_404
+from .models import BusinessHours, Shop
+from .serializers import BusinessHoursSerializer, BusinessHoursCreateUpdateSerializer
+
+class ShopBusinessHoursAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, shop_id, *args, **kwargs):
+        """
+        GET Method: একটি দোকানের ৭ দিনের সময়সূচীর সাথে user এবং shop-এর তথ্যসহ রিটার্ন করে।
+        """
+        # প্রথমে শপটি খুঁজে বের করা হচ্ছে এবং নিশ্চিত করা হচ্ছে যে এটি বর্তমান ইউজারেরই শপ।
+        shop = get_object_or_404(Shop, id=shop_id, user=request.user)
+        # শপের সাথে সম্পর্কিত ইউজার অবজেক্টটি নিয়ে নেওয়া হচ্ছে।
+        user = shop.user
+
+        # ৭ দিনের সময়সূচী তৈরির আগের লজিকটি অপরিবর্তিত থাকবে।
+        queryset = BusinessHours.objects.filter(shop=shop)
+        existing_hours_map = {bh.day: bh for bh in queryset}
+        full_schedule_list = []
+
+        for day_index, day_name in BusinessHours.DayOfWeek.choices:
+            if day_index in existing_hours_map:
+                serializer = BusinessHoursSerializer(existing_hours_map[day_index])
+                full_schedule_list.append(serializer.data)
             else:
-                all_hours.append({
-                    "day": day,
+                full_schedule_list.append({
+                    "id": None,
+                    "day": day_name,
                     "open_time": None,
                     "close_time": None,
-                    "is_closed": True 
+                    "is_closed": True
                 })
-                
-        return Response(all_hours, status=status.HTTP_200_OK)
 
-    def post(self, request, shop_id):
-        shop = get_object_or_404(Shop, id=shop_id)
-        hours_data = request.data
-        print(hours_data)
-        if not isinstance(hours_data, list):
-            return Response({"error": "Request data must be a list of business hours."}, status=status.HTTP_400_BAD_REQUEST)
+        # ===> মূল পরিবর্তনটি এখানে <===
+        # আমরা এখন একটি নতুন ডিকশনারি তৈরি করছি যা চূড়ান্ত রেসপন্স হিসেবে পাঠানো হবে।
+        response_data = {
+            'user_id': user.id,
+            'user_email': user.email, # Django-এর ডিফল্ট User মডেলে 'email' ফিল্ড থাকে
+            'shop_id': shop.id,
+            'schedule': full_schedule_list # ৭ দিনের তালিকাটি 'schedule' কী-এর ভেতরে রাখা হচ্ছে
+        }
 
-        serializer = BusinessHoursSerializer(data=hours_data, many=True)
-        if serializer.is_valid():
-            try:
-                with transaction.atomic():
-                    for item in serializer.validated_data:
-                        BusinessHours.objects.update_or_create(
-                            shop=shop,
-                            day=item['day'],
-                            defaults={
-                                'open_time': item['open_time'],
-                                'close_time': item['close_time'],
-                                'is_closed': item['is_closed']
-                            }
-                        )
-                return Response({"message": "Business hours updated successfully."}, status=status.HTTP_200_OK)
-            except Exception as e:
-                return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-        else:
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        return Response(response_data, status=status.HTTP_200_OK)
+
+    # POST এবং PATCH মেথড দুটি অপরিবর্তিত থাকবে
+    def post(self, request, shop_id, *args, **kwargs):
+        # ... কোনো পরিবর্তন নেই ...
+        data = request.data
+        if not isinstance(data, list):
+            return Response({"detail": "Request body must be a list."}, status=status.HTTP_400_BAD_REQUEST)
+
+        shop = get_object_or_404(Shop, id=shop_id, user=request.user)
         
-    def patch(self, request, shop_id):
-        """
-        একটি শপের জন্য Business Hours আংশিকভাবে আপডেট করে।
-        শুধুমাত্র রিকোয়েস্টে পাঠানো দিনগুলোর তথ্য পরিবর্তন করে।
-        """
-        shop = get_object_or_404(Shop, id=shop_id)
-        hours_data = request.data
-        
+        response_data, error_data = [], []
+        for item in data:
+            day = item.get('day')
+            instance, _ = BusinessHours.objects.get_or_create(shop=shop, day=day, defaults={'user': request.user})
+            
+            serializer = BusinessHoursCreateUpdateSerializer(instance, data=item, context={'request': request})
+            if serializer.is_valid():
+                serializer.save(shop=shop)
+                response_data.append(serializer.data)
+            else:
+                error_data.append({'day': day, 'errors': serializer.errors})
 
-        if not isinstance(hours_data, list):
-            return Response({"error": "Request data must be a list of business hours."}, status=status.HTTP_400_BAD_REQUEST)
+        if error_data:
+            return Response(error_data, status=status.HTTP_400_BAD_REQUEST)
+        return Response(response_data, status=status.HTTP_200_OK)
 
-        serializer = BusinessHoursSerializer(data=hours_data, many=True)
-        if serializer.is_valid():
-            try:
-                with transaction.atomic():
-                    for item in serializer.validated_data:
-                        BusinessHours.objects.update_or_create(
-                            shop=shop,
-                            day=item['day'],
-                            defaults={
-                                'open_time': item.get('open_time'),
-                                'close_time': item.get('close_time'),
-                                'is_closed': item.get('is_closed', False)
-                            }
-                        )
-                return Response({"message": "Business hours partially updated successfully."}, status=status.HTTP_200_OK)
-            except Exception as e:
-                return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-        else:
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    def patch(self, request, shop_id, *args, **kwargs):
+        return self.post(request, shop_id, *args, **kwargs)

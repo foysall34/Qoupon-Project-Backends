@@ -30,3 +30,33 @@ class CreateStoreView(generics.CreateAPIView):
         }
         
         return Response(custom_response_data, status=status.HTTP_201_CREATED, headers=headers)
+    
+
+from rest_framework import viewsets, parsers
+from .models import Deal, Vendor_Category, ModifierGroup
+from .serializers import DealSerializer, CategorySerializer, ModifierGroupSerializer
+
+class CategoryViewSet(viewsets.ModelViewSet):
+    """
+    API endpoint that allows categories to be viewed or edited.
+    Provides data for the 'Category' dropdown in the app.
+    """
+    queryset = Vendor_Category.objects.all()
+    serializer_class = CategorySerializer
+
+class ModifierGroupViewSet(viewsets.ModelViewSet):
+    """
+    API endpoint that allows modifier groups to be viewed or edited.
+    Provides data for the 'Choose Modifier Groups' dropdown.
+    """
+    queryset = ModifierGroup.objects.all()
+    serializer_class = ModifierGroupSerializer
+
+class DealViewSet(viewsets.ModelViewSet):
+    """
+    API endpoint for creating, viewing, and editing Deals.
+    """
+    queryset = Deal.objects.all().order_by('-created_at')
+    serializer_class = DealSerializer
+    # Add parsers to handle file uploads (for the image field)
+    parser_classes = [parsers.MultiPartParser, parsers.FormParser]

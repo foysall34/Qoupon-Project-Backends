@@ -21,7 +21,7 @@ class Shop(models.Model):
         ('Delivery & Pickup', 'Delivery & Pickup'),
     )
 
-
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='myuser' ,null= True)
     name = models.CharField(max_length=200)
     category = models.ForeignKey(Category, related_name='shops', on_delete=models.SET_NULL, null=True)
     description = models.TextField(blank=True, null=True)
@@ -93,14 +93,14 @@ class BusinessHours(models.Model):
         FRIDAY = 4, 'Friday'
         SATURDAY = 5, 'Saturday'
         SUNDAY = 6, 'Sunday'
-
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='user', null= True )
     shop = models.ForeignKey(Shop, on_delete=models.CASCADE, related_name='business_hours')
     day = models.IntegerField(choices=DayOfWeek.choices)
     open_time = models.TimeField(null=True, blank=True)
     close_time = models.TimeField(null=True, blank=True)
     
 
-    is_closed = models.BooleanField(default=False, help_text="এই দিনে কি শপটি পুরোপুরি বন্ধ থাকবে?")
+    is_closed = models.BooleanField(default=False, help_text="Is this closed Shop full day ")
 
     class Meta:
         unique_together = ('shop', 'day')

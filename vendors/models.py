@@ -1,4 +1,3 @@
-# stores/models.py
 
 from django.db import models
 from django.conf import settings
@@ -11,7 +10,7 @@ class Business_profile_Category(models.Model):
         return self.name
 
 class Business_profile(models.Model):
-    owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='shops')
+    owner = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='business_profile')
     name = models.CharField(max_length=255, verbose_name="Store Name")
     logo = CloudinaryField('logo', null=True, blank=True)
     kvk_number = models.CharField(max_length=50, unique=True, verbose_name="KVK Number")
@@ -25,23 +24,26 @@ class Business_profile(models.Model):
     
 
 class Vendor_Category(models.Model):
-    """
-    Represents a category for a deal, e.g., "Breakfast", "Lunch".
-    """
-    name = models.CharField(max_length=100, unique=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+    CATEGORY_CHOICES = [
+        ('Breakfast', 'Breakfast'),
+        ('Lunch', 'Lunch'),
+        ('Dinner', 'Dinner'),
+        ('Snacks', 'Snacks'),
+    ]
 
-    class Meta:
-        verbose_name_plural = "Categories"
+    category_title = models.CharField(max_length=255 , default='write title')
+    category_description = models.TextField(default='write description')
+    category_price = models.DecimalField(max_digits=8, decimal_places=2, default=0.0)
+    category_image = CloudinaryField('logo' , null = True)
+    choice_category = models.CharField(max_length=50, choices=CATEGORY_CHOICES , null= True )
+                           
+    
 
     def __str__(self):
-        return self.name
+        return f" {self.choice_category}"
 
 class ModifierGroup(models.Model):
-    """
-    Represents a group of choices for a deal, e.g., "Choice of Toppings".
-    """
+    
     name = models.CharField(max_length=100, unique=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -51,7 +53,7 @@ class ModifierGroup(models.Model):
 
 class Deal(models.Model):
     """
-    The main model representing the deal shown in the UI.
+     Menu part 88888888888888888******************
     """
     title = models.CharField(max_length=255)
     description = models.TextField()
@@ -66,3 +68,53 @@ class Deal(models.Model):
 
     def __str__(self):
         return self.title
+    
+
+# create deals ---------------------------------------
+
+
+class Create_Deal(models.Model):
+    class RedemptionType(models.TextChoices):
+        DELIVERY = 'DELIVERY', 'Delivery'
+        PICKUP = 'PICKUP', 'Pickup'
+        BOTH = 'BOTH', 'Delivery & Pickup'
+
+    class DiscountType(models.TextChoices):
+        PERCENTAGE = 'PERCENTAGE', 'Percentage'
+        FIXED = 'FIXED', 'Fixed Amount'
+
+  
+    linked_menu_item = models.ForeignKey(Deal, on_delete=models.CASCADE, related_name='deals')
+    
+    title = models.CharField(max_length=255)
+    description = models.TextField()
+    image = CloudinaryField('deal_image')
+    
+    discount_type = models.CharField(max_length=20, choices=DiscountType.choices)
+    discount_value = models.DecimalField(max_digits=10, decimal_places=2, help_text="Percentage or fixed amount")
+
+    start_date = models.DateTimeField()
+    end_date = models.DateTimeField()
+    
+    redemption_type = models.CharField(max_length=20, choices=RedemptionType.choices)
+    
+    max_coupons_total = models.PositiveIntegerField(verbose_name="Max Coupons For This Deal")
+    max_coupons_per_customer = models.PositiveIntegerField(default=1, verbose_name="Max Coupons Per Customer")
+
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.title
+
+class DeliveryCost(models.Model):
+    deal = models.ForeignKey(Create_Deal, on_delete=models.CASCADE,related_name='delivery_costs')
+    zip_code = models.CharField(max_length=20)
+    delivery_fee = models.DecimalField(max_digits=6, decimal_places=2)
+    min_order_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+
+    class Meta:
+        unique_together = ('deal', 'zip_code') 
+
+    def __str__(self):
+        return f"{self.deal.title} - {self.zip_code}"

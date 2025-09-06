@@ -146,39 +146,50 @@ class DeliveryCostSerializer(serializers.ModelSerializer):
 
 
 class Create_DealSerializer(serializers.ModelSerializer):
-   
     delivery_costs = DeliveryCostSerializer(many=True)
     email = serializers.ReadOnlyField(source='user.email') 
     user_id = serializers.ReadOnlyField(source='user.id')
-    image_url = serializers.SerializerMethodField()
+    image_url = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = Create_Deal
         fields = [
-            'id', 'user_id', 'email', 'linked_menu_item', 'title', 'description', 
-            'image','image_url',  'discount_value', 'start_date', 'end_date',
-            'redemption_type', 'max_coupons_total', 'max_coupons_per_customer',
+            'id', 
+            'user_id', 
+            'email', 
+            'linked_menu_item', 
+            'title', 
+            'description', 
+            'image',
+            'image_url',  
+            'discount_value',
+            'start_date', 
+            'end_date',
+            'redemption_type', 
+            'max_coupons_total', 
+            'max_coupons_per_customer',
             'delivery_costs' 
         ]
-        # nested object-কে write-only করা যেতে পারে, যদি প্রয়োজন হয়
-        extra_kwargs = {'image': {'write_only': True}}
+        extra_kwargs = {
+            'image': {'write_only': True, 'required': False}
+        }
 
     def get_image_url(self, obj):
-        if obj.image:
+        request = self.context.get('request')
+        if obj.image and hasattr(obj.image, 'url'):
+            if request is not None:
+                return request.build_absolute_uri(obj.image.url)
             return obj.image.url
         return None
     
-
-
     def validate(self, data):
-        # Start date and end date validation
         if 'start_date' in data and 'end_date' in data and data['start_date'] >= data['end_date']:
             raise serializers.ValidationError({"end_date": "End date must be after start date."})
-        
+        return data
+
 
     def create(self, validated_data):
         delivery_costs_data = validated_data.pop('delivery_costs')
-        # ViewSet-এর perform_create থেকে user এখানে আসবে
         deal = Create_Deal.objects.create(**validated_data)
         for cost_data in delivery_costs_data:
             DeliveryCost.objects.create(deal=deal, **cost_data)
@@ -186,7 +197,6 @@ class Create_DealSerializer(serializers.ModelSerializer):
 
     def update(self, instance, validated_data):
         delivery_costs_data = validated_data.pop('delivery_costs', None)
-        
         instance = super().update(instance, validated_data)
 
         if delivery_costs_data is not None:
@@ -196,7 +206,6 @@ class Create_DealSerializer(serializers.ModelSerializer):
                 
         return instance
 
-# for category (breakfast , lunch , dinner )
 class Categories_Serializer(serializers.ModelSerializer):
     class Meta:
         model = Vendor_Category

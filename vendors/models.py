@@ -53,8 +53,9 @@ class ModifierGroup(models.Model):
 
 class Deal(models.Model):
     """
-     Menu part 88888888888888888******************
+     Menu part ******************
     """
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='deals_user' , null= True)
     title = models.CharField(max_length=255)
     description = models.TextField()
     price = models.DecimalField(max_digits=8, decimal_places=2)
@@ -79,18 +80,16 @@ class Create_Deal(models.Model):
         PICKUP = 'PICKUP', 'Pickup'
         BOTH = 'BOTH', 'Delivery & Pickup'
 
-    class DiscountType(models.TextChoices):
-        PERCENTAGE = 'PERCENTAGE', 'Percentage'
-        FIXED = 'FIXED', 'Fixed Amount'
+  
 
   
     linked_menu_item = models.ForeignKey(Deal, on_delete=models.CASCADE, related_name='deals')
-    
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='create', null= True)
     title = models.CharField(max_length=255)
     description = models.TextField()
     image = CloudinaryField('deal_image')
     
-    discount_type = models.CharField(max_length=20, choices=DiscountType.choices)
+
     discount_value = models.DecimalField(max_digits=10, decimal_places=2, help_text="Percentage or fixed amount")
 
     start_date = models.DateTimeField()

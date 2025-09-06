@@ -104,8 +104,6 @@ class BusinessHours(models.Model):
         SATURDAY = 5, 'Saturday'
         SUNDAY = 6, 'Sunday'
     
-    # shop ফিল্ডটি এখানে ছিল, সেটি মুছে ফেলা হয়েছে।
-    # এখন সরাসরি user-এর সাথে সম্পর্ক।
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='business_hours')
     
     day = models.IntegerField(choices=DayOfWeek.choices)

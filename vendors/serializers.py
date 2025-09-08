@@ -215,3 +215,17 @@ class Categories_Serializer(serializers.ModelSerializer):
     'category_price',
     'category_image',
     'choice_category' ]
+        
+
+from .models import Image
+
+class ImageSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Image
+        fields = ('image',)
+
+    def to_representation(self, instance):
+        representation = super().to_representation(instance)
+        # ছবির secure_url পেতে
+        representation['image'] = instance.image.url
+        return representation

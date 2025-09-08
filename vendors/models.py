@@ -117,3 +117,9 @@ class DeliveryCost(models.Model):
 
     def __str__(self):
         return f"{self.deal.title} - {self.zip_code}"
+    
+
+
+
+class Image(models.Model):
+    image = CloudinaryField('image')

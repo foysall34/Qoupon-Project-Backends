@@ -5,6 +5,7 @@ from cloudinary.models import CloudinaryField
 
 class Business_profile_Category(models.Model):
     name = models.CharField(max_length=100, unique=True)
+    category_image = CloudinaryField('logo' , null = True)
     
     def __str__(self):
         return self.name

@@ -9,23 +9,37 @@ User = get_user_model()
 
 
 class BusinessProfileCategorySerializer(serializers.ModelSerializer):
+    logo_image = serializers.SerializerMethodField()
     class Meta:
         model = Business_profile_Category
-        fields = '__all__'
+        fields =  [ 'id','name' , 'category_image' , 'logo_image']
+        extra_kwargs = {
+            
+            'category_image': {
+            'write_only': True,
+         
+            
+            },}
+    def get_logo_image(self, obj):
+        if obj.category_image:
+            return obj.category_image.url
+        return None
 
 
 
 
 
 class Business_profile_Serializer(serializers.ModelSerializer):
-    owner = serializers.ReadOnlyField(source='owner.username') 
+    vendor_email = serializers.ReadOnlyField(source='owner.email') 
+    vendor_id = serializers.ReadOnlyField(source = 'owner.id' )
     logo_image = serializers.SerializerMethodField()
 
     class Meta:
         model = Business_profile
         fields = [
             'id',
-            'owner',
+            'vendor_email',
+            'vendor_id',
             'name',
             'logo',
             'logo_image',
@@ -37,7 +51,12 @@ class Business_profile_Serializer(serializers.ModelSerializer):
 
         extra_kwargs = {
             
-            'logo': {'write_only': True},
+            'logo': {
+            'write_only': True,
+            'required': True 
+            
+            },
+       
          }
         
     def get_logo_image(self, obj):
@@ -226,6 +245,5 @@ class ImageSerializer(serializers.ModelSerializer):
 
     def to_representation(self, instance):
         representation = super().to_representation(instance)
-        # ছবির secure_url পেতে
         representation['image'] = instance.image.url
         return representation

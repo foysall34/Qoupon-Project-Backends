@@ -7,18 +7,25 @@ from rest_framework import generics, permissions, status
 from rest_framework.filters import SearchFilter
 from rest_framework .permissions import IsAuthenticated
 from rest_framework.parsers import MultiPartParser, FormParser
+from django.shortcuts import get_object_or_404 
 
-class CreateStoreView(generics.CreateAPIView):
+class AllBusinessProfilesListView(generics.ListAPIView):
+    queryset = Business_profile.objects.all()
+    serializer_class = Business_profile_Serializer
+
+
+class CreateStoreView(generics.ListCreateAPIView):
     queryset = Business_profile.objects.all()
     serializer_class = Business_profile_Serializer
     permission_classes = [permissions.IsAuthenticated]
 
+    def get_queryset(self):
+        return Business_profile.objects.filter(owner=self.request.user)
+
     def perform_create(self, serializer):
-      
         serializer.save(owner=self.request.user)
 
     def create(self, request, *args, **kwargs):
-   
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         self.perform_create(serializer)
@@ -33,6 +40,39 @@ class CreateStoreView(generics.CreateAPIView):
         
         return Response(custom_response_data, status=status.HTTP_201_CREATED, headers=headers)
     
+
+# For PATCH METHOD & UPDATE METHOD 
+
+
+class CreateStoreViewPatch(generics.RetrieveUpdateAPIView):
+   
+    serializer_class = Business_profile_Serializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_object(self):
+        
+        queryset = Business_profile.objects.filter(owner=self.request.user)
+        # get_object_or_404 ব্যবহার করে নিশ্চিত করা হচ্ছে যে ব্যবহারকারীর একটি প্রোফাইল আছে
+        # যদি না থাকে, তাহলে 404 Not Found এরর আসবে।
+        obj = get_object_or_404(queryset)
+        return obj
+
+    def update(self, request, *args, **kwargs):
+        """
+        PATCH/PUT রিকোয়েস্টের জন্য কাস্টম রেসপন্স ফরম্যাট তৈরি করে।
+        """
+        partial = kwargs.pop('partial', True) # PATCH এর জন্য partial=True সেট করা হলো
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+
+        custom_response_data = {
+            "message": "Your business profile has been updated successfully.",
+            "data": serializer.data
+        }
+
+        return Response(custom_response_data, status=status.HTTP_200_OK)
 
 from rest_framework import viewsets, parsers
 from .models import Deal, Vendor_Category, ModifierGroup
@@ -94,17 +134,23 @@ class CreateDealViewSet(viewsets.ModelViewSet):
     filterset_fields = ['user']  
 
     def get_queryset(self):
-        """
-        """
         user = self.request.user
         if user.is_staff: 
             return super().get_queryset() 
         return Create_Deal.objects.filter(user=user).order_by('-created_at')
 
     def perform_create(self, serializer):
-        """
-        """
         serializer.save(user=self.request.user)
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        self.perform_destroy(instance)
+        return Response(
+            {"message": "Deal deleted successfully."},
+            status=status.HTTP_204_NO_CONTENT
+        )
+
+
 # for categories views.py (breakfast , lunch , dinner )
 class categoryItemListView(generics.ListAPIView):
     """
@@ -114,8 +160,6 @@ class categoryItemListView(generics.ListAPIView):
     - /api/menu/?category=Lunch&search=Steak 
     """
     serializer_class = Categories_Serializer
-    
- 
     filter_backends = [SearchFilter]
     search_fields = ['title', 'description']
 
@@ -142,7 +186,7 @@ class ImageUploadView(APIView):
         serializer = ImageSerializer(data=request.data)
         if serializer.is_valid():
             serializer.save()
-            # সফলভাবে আপলোড হলে HTTPS URL সহ প্রতিক্রিয়া পাঠান
+        
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         else:
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

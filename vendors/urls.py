@@ -1,7 +1,7 @@
 
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from .views import ImageUploadView,BusinessProfileCategoryViewSet,categoryItemListView,DealViewSet, CategoryViewSet, ModifierGroupViewSet , CreateStoreView ,CreateDealViewSet
+from .views import  CreateStoreViewPatch,AllBusinessProfilesListView,ImageUploadView,BusinessProfileCategoryViewSet,categoryItemListView,DealViewSet, CategoryViewSet, ModifierGroupViewSet , CreateStoreView ,CreateDealViewSet
 
 
 router = DefaultRouter()
@@ -15,6 +15,8 @@ router.register(r'vendor-categories', BusinessProfileCategoryViewSet, basename='
 urlpatterns = [
     path('', include(router.urls)),
     path('business-profile/', CreateStoreView.as_view(), name='create-store'),
+    path('all-business-profile/', AllBusinessProfilesListView.as_view(), name='all-stores-list'),
+    path('businessh-profile/manage/', CreateStoreViewPatch.as_view(), name='store-detail'),
     path('mymenu-category/', categoryItemListView.as_view(), name='menu-item-list'),
     path('upload/', ImageUploadView.as_view(), name='image-upload'),
 

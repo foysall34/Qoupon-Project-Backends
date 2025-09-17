@@ -125,7 +125,7 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from .models import BusinessHours
-from .serializers import BusinessHoursSerializer # আপনার Serializer অপরিবর্তিত থাকতে পারে
+from .serializers import BusinessHoursSerializer 
 from django.shortcuts import get_object_or_404
 from django.contrib.auth import get_user_model 
 
@@ -135,14 +135,9 @@ class UserBusinessHoursAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, user_id, *args, **kwargs):
-        """
-        GET Method: নির্দিষ্ট user_id-এর জন্য ৭ দিনের ব্যবসার সময়সূচী রিটার্ন করে।
-        """
-        # URL থেকে প্রাপ্ত user_id দিয়ে ব্যবহারকারীকে খুঁজে বের করা হচ্ছে
-        # যদি ব্যবহারকারীকে খুঁজে না পাওয়া যায়, তাহলে 404 এরর দেবে
+    
         user = get_object_or_404(User, id=user_id)
-        
-        # বাকি লজিক আগের মতোই থাকবে
+
         queryset = BusinessHours.objects.filter(user=user)
         existing_hours_map = {bh.day: bh for bh in queryset}
         
@@ -170,9 +165,6 @@ class UserBusinessHoursAPIView(APIView):
         return Response(response_data, status=status.HTTP_200_OK)
 
     def post(self, request, *args, **kwargs):
-        """
-        POST/PATCH Method: ব্যবহারকারীর জন্য ব্যবসার সময়সূচী তৈরি বা আপডেট করে।
-        """
         data = request.data
         if not isinstance(data, list):
             return Response({"detail": "Request body must be a list of schedule items."}, status=status.HTTP_400_BAD_REQUEST)
@@ -186,16 +178,14 @@ class UserBusinessHoursAPIView(APIView):
                 error_data.append({'item': item, 'errors': 'Day is required.'})
                 continue
             
-            # get_or_create এখন user এবং day ব্যবহার করে কাজ করবে।
+      
             instance, created = BusinessHours.objects.get_or_create(user=user, day=day)
             
-            # আপনার Serializer ব্যবহার করে ডেটা ভ্যালিডেট এবং সেভ করা হচ্ছে।
-            # BusinessHoursCreateUpdateSerializer বা আপনার ব্যবহৃত যেকোনো Serializer।
+       
             serializer = BusinessHoursSerializer(instance, data=item, context={'request': request})
             
             if serializer.is_valid():
-                # serializer.save() করার সময় user অটোমেটিক पास করার দরকার নেই যদি serializer সঠিকভাবে হ্যান্ডেল করে।
-                # তবে নিশ্চিত করার জন্য user=user পাস করা ভালো।
+            
                 serializer.save(user=user)
                 response_data.append(serializer.data)
             else:

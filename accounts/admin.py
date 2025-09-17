@@ -3,7 +3,7 @@ from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from .models import User
 
 class UserAdmin(BaseUserAdmin):
-    # Admin panel এ যেসব ফিল্ড দেখাবে
+    
     list_display = ('id', 'email', 'referral_code', 'user_type', 'is_active', 'is_staff')
     list_filter = ('user_type', 'is_active', 'is_staff', 'is_superuser')
     

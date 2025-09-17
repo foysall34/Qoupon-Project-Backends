@@ -24,9 +24,7 @@ urlpatterns = [
     path('menu/<int:user_id>/name/', MenuCategoryListAPIView.as_view(), name='user-category-list'),
     
     path('menu/<int:user_id>/categories/<int:pk>/', MenuCategoryDetailAPIView.as_view(), name='user-category-detail'),
-    # payment gateway 
     path('payment/'  , CreatePaymentView.as_view() , name= 'mollie-payment'),
-
     path('', include(router.urls)),
    
     

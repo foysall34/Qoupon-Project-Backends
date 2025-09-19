@@ -1,7 +1,7 @@
 from rest_framework.generics import ListAPIView
 from django.http import Http404
-from .models import Restaurant
-from .serializers import RestaurantSerializer, OfferSerializer  , OrderSerializer 
+from .models import FAQ, Restaurant
+from .serializers import FAQSerializer, RestaurantSerializer, OfferSerializer  , OrderSerializer 
 from rest_framework.permissions import AllowAny 
 from django_filters import rest_framework as filters
 from .models import Restaurant, Cuisine, Diet, Offer , Order , VendorFollowed  
@@ -353,3 +353,11 @@ class ReviewMenuItemViewSet(ModelViewSet):
 
     def get_queryset(self):
         return ReviewMenuItem.objects.filter(user=self.request.user)
+
+
+
+class FAQListView(APIView):
+    def get(self, request, format=None):
+        faqs = FAQ.objects.all()
+        serializer = FAQSerializer(faqs, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)

@@ -1,5 +1,5 @@
 from rest_framework import serializers 
-from .models import Restaurant , Offer , Order , VendorFollowed 
+from .models import FAQ, Restaurant , Offer , Order , VendorFollowed 
 from .models import Restaurant, Cuisine, Diet , CoffeeSubscriptionOffer, ReviewMenuItem
 from decimal import Decimal
 
@@ -321,3 +321,8 @@ class ReviewMenuItemSerializer(serializers.ModelSerializer):
         user = self.context['request'].user
         return ReviewMenuItem.objects.create(user=user, **validated_data)
    
+
+class FAQSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = FAQ
+        fields = ['id', 'question', 'answer']

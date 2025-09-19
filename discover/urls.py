@@ -26,6 +26,7 @@ urlpatterns = [
     path('menu/<int:user_id>/categories/<int:pk>/', MenuCategoryDetailAPIView.as_view(), name='user-category-detail'),
     path('payment/'  , CreatePaymentView.as_view() , name= 'mollie-payment'),
     path('', include(router.urls)),
+    path('review-menu-item/', views.ReviewMenuItemViewSet.as_view({'post': 'create'}), name='review-menu-item-create'),
    
     
 ]

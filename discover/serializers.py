@@ -1,6 +1,6 @@
 from rest_framework import serializers 
 from .models import Restaurant , Offer , Order , VendorFollowed 
-from .models import Restaurant, Cuisine, Diet , CoffeeSubscriptionOffer 
+from .models import Restaurant, Cuisine, Diet , CoffeeSubscriptionOffer, ReviewMenuItem
 from decimal import Decimal
 
 
@@ -311,6 +311,13 @@ class CartSerializer(serializers.ModelSerializer):
 
 
 
+class ReviewMenuItemSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ReviewMenuItem
+        fields = ['id', 'menu_item', 'user', 'rating', 'comment', 'created_at']
+        read_only_fields = ['id', 'user', 'created_at']
 
-
-
+    def create(self, validated_data):
+        user = self.context['request'].user
+        return ReviewMenuItem.objects.create(user=user, **validated_data)
+   

@@ -25,10 +25,10 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 
-from .models import MenuCategory, Cart, CartItem, MenuItem, OptionChoice, OptionGroup
+from .models import MenuCategory, Cart, CartItem, MenuItem, OptionChoice, OptionGroup, ReviewMenuItem
 from .serializers import (
     MenuCategorySerializer, CartSerializer, CartItemSerializer,
-    AddCartItemSerializer, UpdateCartItemSerializer, MenuItemSerializer
+    AddCartItemSerializer, UpdateCartItemSerializer, MenuItemSerializer, ReviewMenuItemSerializer
 )
 
 
@@ -344,3 +344,12 @@ class CreatePaymentView(APIView):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
+
+class ReviewMenuItemViewSet(ModelViewSet):
+
+    queryset = ReviewMenuItem.objects.all()
+    serializer_class = ReviewMenuItemSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return ReviewMenuItem.objects.filter(user=self.request.user)

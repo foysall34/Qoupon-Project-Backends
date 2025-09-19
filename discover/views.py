@@ -361,3 +361,11 @@ class FAQListView(APIView):
         faqs = FAQ.objects.all()
         serializer = FAQSerializer(faqs, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
+    
+
+class MyReviewListView(ListAPIView):
+    serializer_class = ReviewMenuItemSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return ReviewMenuItem.objects.filter(user=self.request.user).order_by('-created_at')

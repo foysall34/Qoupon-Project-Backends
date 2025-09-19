@@ -178,7 +178,8 @@ class ReviewMenuItem(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"Review by {self.user} for {self.menu_item.name}"    
+        return f"Review by {self.user} for {self.menu_item.name}"   
+
 
 
 class OptionGroup(models.Model):

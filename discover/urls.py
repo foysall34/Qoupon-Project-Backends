@@ -28,6 +28,7 @@ urlpatterns = [
     path('', include(router.urls)),
     path('review-menu-item/', views.ReviewMenuItemViewSet.as_view({'post': 'create'}), name='review-menu-item-create'),
     path('faqs/', views.FAQListView.as_view(), name='faq-list'),
+    path('my-reviews/', views.MyReviewListView.as_view(), name='my-review-list'),
    
     
 ]

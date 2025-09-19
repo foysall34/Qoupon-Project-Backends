@@ -197,7 +197,6 @@ class UserBusinessHoursAPIView(APIView):
         return Response(response_data, status=status.HTTP_201_CREATED)
 
     def patch(self, request, *args, **kwargs):
-        # PATCH রিকোয়েস্টকেও POST মেথডের মতোই হ্যান্ডেল করা হচ্ছে।
         return self.post(request, *args, **kwargs)
 
 

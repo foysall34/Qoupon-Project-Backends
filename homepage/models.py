@@ -89,9 +89,9 @@ class Shop(models.Model):
 
 from django.db import models
 from django.conf import settings
-import datetime # <--- এটি import করুন
+import datetime 
 
-# ... আপনার অন্যান্য মডেল (Category, Shop, etc.) অপরিবর্তিত থাকবে ...
+
 
 
 class BusinessHours(models.Model):
@@ -108,18 +108,18 @@ class BusinessHours(models.Model):
     
     day = models.IntegerField(choices=DayOfWeek.choices)
     
-    # ডিফল্ট সময় সেট করা হয়েছে।
-    open_time = models.TimeField(null=True, blank=True, default=datetime.time(0, 0)) # ডিফল্ট 12:00 AM
-    close_time = models.TimeField(null=True, blank=True, default=datetime.time(23, 59)) # ডিফল্ট 11:59 PM
+
+    open_time = models.TimeField(null=True, blank=True, default=datetime.time(0, 0))
+    close_time = models.TimeField(null=True, blank=True, default=datetime.time(23, 59)) 
 
     is_closed = models.BooleanField(default=False, help_text="Is the business closed for the entire day?")
 
     class Meta:
-        # unique_together আপডেট করা হয়েছে shop-এর পরিবর্তে user ব্যবহারের জন্য।
+      
         unique_together = ('user', 'day')
 
     def __str__(self):
-        # __str__ মেথডটি user-এর username দেখানোর জন্য আপডেট করা হয়েছে।
+
         return f"{self.user.username} - {self.get_day_display()}"
 
 

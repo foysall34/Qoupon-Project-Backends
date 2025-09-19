@@ -42,7 +42,7 @@ class PlaceSerializer(serializers.ModelSerializer):
             'google_maps_url',
             'created_at'
         ]
-        # latitude এবং longitude শুধুমাত্র দেখানোর জন্য, ইউজার ইনপুট দেবে না
+     
         read_only_fields = ['id', 'latitude', 'longitude', 'google_maps_url', 'created_at']
 
     def get_google_maps_url(self, obj):
@@ -53,18 +53,18 @@ class PlaceSerializer(serializers.ModelSerializer):
     def _get_coordinates(self, address):
         """ Find latitude & longitude function  """
         try:
-            geolocator = Nominatim(user_agent="my_place_app") # একটি ইউনিক user_agent দিন
+            geolocator = Nominatim(user_agent="my_place_app") 
             location = geolocator.geocode(address)
             if location:
                 return location.latitude, location.longitude
             return None, None
         except GeocoderUnavailable:
-            # যদি জিওকোডিং সার্ভিস কাজ না করে
+         
             raise serializers.ValidationError("Geocoding service is unavailable. Please try again later.")
 
 
     def create(self, validated_data):
-        """ একটি নতুন স্থান তৈরি করার সময় ঠিকানা থেকে lat/lon বের করা হবে """
+    
         address = validated_data.get('address')
         lat, lon = self._get_coordinates(address)
 
@@ -72,14 +72,13 @@ class PlaceSerializer(serializers.ModelSerializer):
             
             raise serializers.ValidationError({"address": "this location can't find ."})
 
-        # নতুন পাওয়া lat/lon ডেটাতে যোগ করা হচ্ছে
         validated_data['latitude'] = lat
         validated_data['longitude'] = lon
         
         return super().create(validated_data)
 
     def update(self, instance, validated_data):
-        """ স্থান আপডেট করার সময় যদি ঠিকানা পরিবর্তন হয়, তাহলে lat/lon আবার বের করা হবে """
+       
         address = validated_data.get('address', instance.address)
 
         # if change the location 

@@ -232,7 +232,7 @@ class CartItem(models.Model):
         return self.add_to_cart_price * self.quantity
 
     def increase_quantity(self, amount: int = 1):
-        """ কার্ট আইটেমের পরিমাণ বাড়ায়। """
+
         self.quantity += amount
         self.save()
 

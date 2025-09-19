@@ -26,7 +26,7 @@ class Place(models.Model):
     # this field is fill up automatically 
     address = models.TextField(unique=True, help_text="must be unique")
     
-    # এই দুটি ফিল্ড স্বয়ংক্রিয়ভাবে পূরণ হবে
+
     latitude = models.FloatField(blank=True, null=True)
     longitude = models.FloatField(blank=True, null=True)
     
@@ -60,7 +60,7 @@ class Profile(models.Model):
     def __str__(self):
          return f"{self.user.get_username()}'s Profile"
 
-# সিগন্যাল: যখনই একজন নতুন User তৈরি হবে, তার জন্য একটি Profile অবজেক্টও স্বয়ংক্রিয়ভাবে তৈরি হয়ে যাবে
+
 @receiver(post_save, sender=settings.AUTH_USER_MODEL)
 def create_or_update_user_profile(sender, instance, created, **kwargs):
     if created:

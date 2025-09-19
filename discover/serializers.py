@@ -292,7 +292,7 @@ class UpdateCartItemSerializer(serializers.ModelSerializer):
         }
 
 class CartSerializer(serializers.ModelSerializer):
-    """ সম্পূর্ণ কার্ট দেখানোর জন্য। """
+
     items = CartItemSerializer(many=True, read_only=True)
     price_summary = serializers.SerializerMethodField()
     user_email = serializers.EmailField(source = 'user.email' , read_only = True , allow_null=True )

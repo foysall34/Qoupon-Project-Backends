@@ -32,8 +32,6 @@ from .serializers import (
 )
 
 
-
-
 from rest_framework.filters import SearchFilter
 
 class RestaurantListView(ListAPIView):
@@ -140,9 +138,7 @@ class VendorSearchListView(generics.ListAPIView):
 
 
 class MenuCategoryListAPIView(APIView):
-    """
-    একটি নির্দিষ্ট ব্যবহারকারীর জন্য সমস্ত MenuCategory তালিকাভুক্ত করে।
-    """
+
     def get(self, request, user_id, format=None):
        
         categories = MenuCategory.objects.filter(user_id=user_id).prefetch_related('items__option_title__options')
@@ -151,13 +147,8 @@ class MenuCategoryListAPIView(APIView):
 
 
 class MenuCategoryDetailAPIView(APIView):
-    """
-    একটি নির্দিষ্ট MenuCategory অবজেক্টের বিস্তারিত তথ্য প্রদান এবং আইটেম আপডেট করে।
-    """
+    
     def get_object(self, user_id, pk):
-        """
-        ডাটাবেস থেকে একটি নির্দিষ্ট MenuCategory অবজেক্ট খুঁজে বের করে।
-        """
         try:
           
             return MenuCategory.objects.get(user_id=user_id, pk=pk)
@@ -165,18 +156,13 @@ class MenuCategoryDetailAPIView(APIView):
             raise Http404
 
     def get(self, request, user_id, pk, format=None):
-        """
-        একটি নির্দিষ্ট MenuCategory-এর বিস্তারিত তথ্য দেখায়।
-        """
+    
+      
         category = self.get_object(user_id, pk)
         serializer = MenuCategorySerializer(category)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     def patch(self, request, user_id, pk, format=None):
-        """
-        'update-item-selection' এর কার্যকারিতা এখানে প্রয়োগ করা হয়েছে।
-        এটি একটি MenuItem-এর 'added_to_cart' অথবা একটি OptionChoice-এর 'is_selected' স্ট্যাটাস আপডেট করে।
-        """
         category = self.get_object(user_id, pk)
         
         item_id = request.data.get('item_id')
@@ -247,14 +233,14 @@ class CartItemViewSet(ModelViewSet):
 
     @action(detail=True, methods=['post'])
     def increase_quantity(self, request, pk=None):
-        """ একটি নির্দিষ্ট কার্ট আইটেমের পরিমাণ ১ বাড়ায়। """
+     
         cart_item = self.get_object()
         cart_item.increase_quantity()
         return Response({'status': 'quantity increased'}, status=status.HTTP_200_OK)
 
     @action(detail=True, methods=['post'])
     def decrease_quantity(self, request, pk=None):
-        """ একটি নির্দিষ্ট কার্ট আইটেমের পরিমাণ ১ কমায়। """
+    
         cart_item = self.get_object()
         cart_item.decrease_quantity()
     

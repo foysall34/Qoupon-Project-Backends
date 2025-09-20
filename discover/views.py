@@ -1,7 +1,7 @@
 from rest_framework.generics import ListAPIView
 from django.http import Http404
-from .models import Restaurant
-from .serializers import RestaurantSerializer, OfferSerializer  , OrderSerializer 
+from .models import FAQ, Restaurant
+from .serializers import FAQSerializer, RestaurantSerializer, OfferSerializer  , OrderSerializer 
 from rest_framework.permissions import AllowAny 
 from django_filters import rest_framework as filters
 from .models import Restaurant, Cuisine, Diet, Offer , Order , VendorFollowed  
@@ -25,10 +25,10 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 
-from .models import MenuCategory, Cart, CartItem, MenuItem, OptionChoice, OptionGroup
+from .models import MenuCategory, Cart, CartItem, MenuItem, OptionChoice, OptionGroup, ReviewMenuItem
 from .serializers import (
     MenuCategorySerializer, CartSerializer, CartItemSerializer,
-    AddCartItemSerializer, UpdateCartItemSerializer, MenuItemSerializer
+    AddCartItemSerializer, UpdateCartItemSerializer, MenuItemSerializer, ReviewMenuItemSerializer
 )
 
 
@@ -323,3 +323,28 @@ class CreatePaymentView(APIView):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
+
+class ReviewMenuItemViewSet(ModelViewSet):
+
+    queryset = ReviewMenuItem.objects.all()
+    serializer_class = ReviewMenuItemSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return ReviewMenuItem.objects.filter(user=self.request.user)
+
+
+
+class FAQListView(APIView):
+    def get(self, request, format=None):
+        faqs = FAQ.objects.all()
+        serializer = FAQSerializer(faqs, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    
+
+class MyReviewListView(ListAPIView):
+    serializer_class = ReviewMenuItemSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return ReviewMenuItem.objects.filter(user=self.request.user).order_by('-created_at')

@@ -162,6 +162,26 @@ class MenuItem(models.Model):
     def __str__(self):
         return self.name
 
+
+class ReviewMenuItem(models.Model):
+    RATING_CHOICES = [
+        (1, '1'),
+        (2, '2'),
+        (3, '3'),
+        (4, '4'),
+        (5, '5'),
+    ]
+    menu_item = models.ForeignKey(MenuItem, related_name='reviews', on_delete=models.CASCADE)
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    rating = models.PositiveIntegerField(choices=RATING_CHOICES)
+    comment = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Review by {self.user} for {self.menu_item.name}"   
+
+
+
 class OptionGroup(models.Model):
     item = models.ForeignKey(MenuItem, related_name='option_title', on_delete=models.CASCADE)
     title = models.CharField(max_length=100)
@@ -267,3 +287,11 @@ class VendorFollowed(models.Model):
 
     def __str__(self):
         return self.category
+
+
+class FAQ(models.Model):
+    question = models.CharField(max_length=255)
+    answer = models.TextField()
+
+    def __str__(self):
+        return self.question

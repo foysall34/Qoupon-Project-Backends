@@ -5,4 +5,5 @@ from . import views
 
 urlpatterns = [
         path('faqs/', views.FAQListView.as_view(), name='faq-list'),
+        path('report-issue/', views.ReportIssueCreateAPI.as_view(), name='report-issue'),
 ]

@@ -52,6 +52,7 @@ class ModifierGroup(models.Model):
     def __str__(self):
         return self.name
 
+# Product table 
 class Deal(models.Model):
     """ 
      Menu part ******************
@@ -74,12 +75,13 @@ class Deal(models.Model):
 
 # create deals ---------------------------------------
 
+# offer table
 
 class Create_Deal(models.Model):
     class RedemptionType(models.TextChoices):
         DELIVERY = 'DELIVERY', 'Delivery'
         PICKUP = 'PICKUP', 'Pickup'
-        BOTH = 'BOTH', 'Delivery & Pickup'
+        # BOTH = 'BOTH', 'Delivery & Pickup'
 
   
 

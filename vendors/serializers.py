@@ -187,7 +187,8 @@ class Create_DealSerializer(serializers.ModelSerializer):
             'redemption_type', 
             'max_coupons_total', 
             'max_coupons_per_customer',
-            'delivery_costs' 
+            'delivery_costs' ,
+            'is_active',
         ]
         extra_kwargs = {
             'image': {'write_only': True, 'required': False}

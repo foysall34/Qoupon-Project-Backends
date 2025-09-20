@@ -289,9 +289,3 @@ class VendorFollowed(models.Model):
         return self.category
 
 
-class FAQ(models.Model):
-    question = models.CharField(max_length=255)
-    answer = models.TextField()
-
-    def __str__(self):
-        return self.question

@@ -119,7 +119,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 
   
 
-
+'''
 
 class CreateDealViewSet(viewsets.ModelViewSet):
     """
@@ -149,6 +149,59 @@ class CreateDealViewSet(viewsets.ModelViewSet):
             {"message": "Deal deleted successfully."},
             status=status.HTTP_204_NO_CONTENT
         )
+'''
+
+
+from io import BytesIO
+from django.core.files.base import ContentFile
+import qrcode
+from qrcode.constants import ERROR_CORRECT_M
+
+class CreateDealViewSet(viewsets.ModelViewSet):
+    """
+    Create, update, delete, list deals.
+    QR code is generated automatically and saved into qrimage.
+    """
+    queryset = Create_Deal.objects.all().order_by('-created_at') 
+    serializer_class = Create_DealSerializer
+    permission_classes = [IsAuthenticated]
+    filter_backends = [DjangoFilterBackend]
+    filterset_fields = ['user']  
+
+    def get_queryset(self):
+        user = self.request.user
+        if user.is_staff: 
+            return super().get_queryset() 
+        return Create_Deal.objects.filter(user=user).order_by('-created_at')
+
+    def perform_create(self, serializer):
+        # First save the deal
+        deal = serializer.save(user=self.request.user)
+
+        # --- Generate QR code ---
+        # 1. Construct QR URL (base + deal id)
+        base_url = "https://intensely-optimal-unicorn.ngrok-free.app/vendors/deals/"   # <--- replace with your base URL
+        qr_data = f"{base_url}{deal.id}/"
+
+        # 2. Generate QR code
+        qr = qrcode.QRCode(
+            version=None,
+            error_correction=ERROR_CORRECT_M,
+            box_size=10,
+            border=4,
+        )
+        qr.add_data(qr_data)
+        qr.make(fit=True)
+        qr_img = qr.make_image(fill_color="black", back_color="white").convert("RGB")
+
+        # 3. Save image to buffer
+        buffer = BytesIO()
+        qr_img.save(buffer, format="PNG")
+        buffer.seek(0)
+
+        # 4. Save to model field
+        filename = f"deal_{deal.id}_qr.png"
+        deal.qrimage.save(filename, ContentFile(buffer.read()), save=True)
 
 
 # for categories views.py (breakfast , lunch , dinner )

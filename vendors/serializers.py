@@ -190,6 +190,7 @@ class Create_DealSerializer(serializers.ModelSerializer):
             'max_coupons_per_customer',
             'delivery_costs' ,
             'is_active',
+            'qrimage',
         ]
         extra_kwargs = {
             'image': {'write_only': True, 'required': False}

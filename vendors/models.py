@@ -92,7 +92,7 @@ class Create_Deal(models.Model):
     description = models.TextField()
     image = CloudinaryField('deal_image')
     
-
+    qrimage = models.ImageField(upload_to='deals_qr/', null=True, blank=True)
     discount_value = models.DecimalField(max_digits=10, decimal_places=2, help_text="Percentage or fixed amount")
 
     start_date = models.DateTimeField()

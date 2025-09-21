@@ -155,6 +155,7 @@ class MenuItem(models.Model):
     calories = models.PositiveIntegerField(null=True, blank=True)
     image = CloudinaryField('image', null=True, blank=True)
     added_to_cart = models.BooleanField(default=False)
+    item_availability = models.BooleanField(default=True)
     
     class Meta:
         ordering = ['name']

@@ -47,6 +47,7 @@ INSTALLED_APPS = [
     'cloudinary',  
     'django_filters', 
     'support',
+    'QrCodeApp',
       
     
 ]

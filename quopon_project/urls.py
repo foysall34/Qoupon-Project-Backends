@@ -8,5 +8,6 @@ urlpatterns = [
     path('home/' , include('homepage.urls')),
     path('discover/' , include('discover.urls')),
     path('vendors/' ,  include('vendors.urls')),
-    path('support/' ,  include('support.urls'))
+    path('support/' ,  include('support.urls')),
+    path('qrcode/' ,  include('QrCodeApp.urls')),
 ]

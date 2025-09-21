@@ -272,9 +272,6 @@ class CartItem(models.Model):
 
 
 
-
-   
-
 class VendorFollowed(models.Model):
     menu_category = models.ForeignKey(MenuCategory,on_delete=models.CASCADE, related_name='vendors')
     title = models.CharField(max_length=200 , default='title' , blank= True, null= True)

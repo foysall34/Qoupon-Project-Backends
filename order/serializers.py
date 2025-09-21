@@ -13,7 +13,7 @@ class QRCodeSerializer(serializers.ModelSerializer):
 class OrderItemSerializer(serializers.ModelSerializer):
     class Meta:
         model = OrderItem
-        fields = ['id', 'menu_item', 'quantity', 'unit_price', 'total_price', 
+        fields = ['id', 'deal', 'quantity', 'unit_price', 'total_price', 
                  'item_name', 'item_description']
         read_only_fields = ['unit_price', 'total_price', 'item_name', 'item_description']
 
@@ -38,10 +38,10 @@ class OrderSerializer(serializers.ModelSerializer):
     class Meta:
         model = Order
         fields = [
-            'id', 'order_id', 'user', 'cart', 'status', 'payment_status',
+            'id', 'order_id', 'user', 'status', 'payment_status',
             'delivery_type', 'order_type', 'scheduled_datetime',
             'subtotal', 'delivery_fee', 'discount_amount', 'total_amount',
-            'delivery_address', 'delivery_postal_code', 'special_instructions',
+            'delivery_address', 'delivery_address_latitude', 'delivery_address_longitude', 'special_instructions',
             'note', 'estimated_delivery_time', 'items', 'applied_deals', 'tracking_history',
             'created_at', 'updated_at', 'delivery_code', 'delivery_code_used', 'qr_code'
         ]

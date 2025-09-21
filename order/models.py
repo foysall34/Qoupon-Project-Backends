@@ -160,10 +160,8 @@ class Order(models.Model):
     
     def save(self, *args, **kwargs):
         if not self.pk:  # New order
-            if self.cart:
-                self.subtotal = self.cart.sub_total_price
-                self.delivery_fee = self.cart.delivery_charges
-                self.total_amount = self.cart.in_total_price - self.discount_amount
+            # Amounts are now set in the create_order view
+            pass
             
             # Generate delivery code for new orders
             if not self.delivery_code:

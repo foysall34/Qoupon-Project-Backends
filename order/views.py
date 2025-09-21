@@ -258,16 +258,49 @@ def create_order(request):
             'discount_amount': str(discount_amount)
         }
     
+    # Validate required fields
+    delivery_type = request.data.get('delivery_type')
+    if not delivery_type or delivery_type not in dict(Order.DeliveryType.choices):
+        return Response(
+            {'error': 'Valid delivery_type (PICKUP or DELIVERY) is required'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    order_type = request.data.get('order_type', Order.OrderType.STANDARD)
+    if order_type not in dict(Order.OrderType.choices):
+        return Response(
+            {'error': 'Invalid order_type. Must be STANDARD or SCHEDULED'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    # Validate scheduled datetime for scheduled orders
+    if order_type == Order.OrderType.SCHEDULED:
+        scheduled_datetime = request.data.get('scheduled_datetime')
+        if not scheduled_datetime:
+            return Response(
+                {'error': 'scheduled_datetime is required for scheduled orders'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+    # Validate delivery address for delivery orders
+    if delivery_type == Order.DeliveryType.DELIVERY:
+        if not request.data.get('delivery_address'):
+            return Response(
+                {'error': 'delivery_address is required for delivery orders'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
     # Create order with PENDING_PAYMENT status
     order = Order.objects.create(
         user=request.user,
         cart_snapshot=cart_data,
-        delivery_type=request.data.get('delivery_type'),
-        order_type=request.data.get('order_type'),
+        delivery_type=delivery_type,
+        order_type=order_type,
         scheduled_datetime=request.data.get('scheduled_datetime'),
         delivery_address=request.data.get('delivery_address'),
-        delivery_postal_code=request.data.get('delivery_postal_code'),
-        special_instructions=request.data.get('special_instructions'),
+        delivery_address_latitude=request.data.get('delivery_address_latitude'),
+        delivery_address_longitude=request.data.get('delivery_address_longitude'),
+        special_instructions=request.data.get('special_instructions', ''),
         note=request.data.get('note', ''),
         subtotal=subtotal,
         delivery_fee=delivery_fee,
@@ -280,7 +313,7 @@ def create_order(request):
     for cart_item in cart.cart_items.all():
         OrderItem.objects.create(
             order=order,
-            menu_item=cart_item.deal,
+            deal=cart_item.deal,
             quantity=cart_item.quantity,
             unit_price=cart_item.deal.price,
             total_price=cart_item.item_total,

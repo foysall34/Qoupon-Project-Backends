@@ -35,7 +35,7 @@ class OrderSerializer(serializers.ModelSerializer):
             'delivery_type', 'order_type', 'scheduled_datetime',
             'subtotal', 'delivery_fee', 'discount_amount', 'total_amount',
             'delivery_address', 'delivery_postal_code', 'special_instructions',
-            'estimated_delivery_time', 'items', 'applied_deals', 'tracking_history',
+            'note', 'estimated_delivery_time', 'items', 'applied_deals', 'tracking_history',
             'created_at', 'updated_at'
         ]
         read_only_fields = [

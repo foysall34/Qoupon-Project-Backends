@@ -50,7 +50,6 @@ def get_cart(request):
                 'image': item.deal.image.url if item.deal.image else None
             },
             'quantity': item.quantity,
-            'special_instructions': item.special_instructions,
             'item_total': str(item.item_total)
         } for item in cart.cart_items.all()],
         'applied_deal': None
@@ -71,7 +70,6 @@ def add_to_cart(request):
     """Add deal to cart or update quantity if already exists"""
     deal_id = request.data.get('menu_item_id')
     quantity = int(request.data.get('quantity', 1))
-    special_instructions = request.data.get('special_instructions', '')
     
     if quantity < 1:
         return Response(
@@ -86,8 +84,7 @@ def add_to_cart(request):
         cart=cart,
         deal=deal,
         defaults={
-            'quantity': quantity,
-            'special_instructions': special_instructions
+            'quantity': quantity
         }
     )
     return Response({'message': 'Item added to cart','cart_total':str(cart.final_total)}, status=status.HTTP_201_CREATED)
@@ -276,6 +273,7 @@ def create_order(request):
         delivery_address=request.data.get('delivery_address'),
         delivery_postal_code=request.data.get('delivery_postal_code'),
         special_instructions=request.data.get('special_instructions'),
+        note=request.data.get('note', ''),
         subtotal=subtotal,
         delivery_fee=delivery_fee,
         discount_amount=discount_amount,

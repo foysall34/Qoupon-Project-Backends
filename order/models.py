@@ -43,7 +43,6 @@ class CartItem(models.Model):
     cart = models.ForeignKey(Cart, on_delete=models.CASCADE, related_name='cart_items')
     deal = models.ForeignKey(Deal, on_delete=models.CASCADE, related_name='order_cart_items')
     quantity = models.PositiveIntegerField(default=1)
-    special_instructions = models.TextField(blank=True)
     added_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
  
@@ -128,7 +127,8 @@ class Order(models.Model):
     
     # Address for delivery
     delivery_address = models.TextField(blank=True, null=True)
-    delivery_postal_code = models.CharField(max_length=10, blank=True, null=True)
+    delivery_address_latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+    delivery_address_longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
     
     # Order Type and Scheduling
     order_type = models.CharField(max_length=10, choices=OrderType.choices, default=OrderType.STANDARD)
@@ -137,6 +137,7 @@ class Order(models.Model):
     
     # Additional Info
     special_instructions = models.TextField(blank=True, null=True)
+    note = models.TextField(blank=True, null=True)
     estimated_delivery_time = models.DateTimeField(null=True, blank=True)
     
     # Delivery Verification

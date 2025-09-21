@@ -1,6 +1,7 @@
 # support/models.py
 from django.db import models
 from django.conf import settings
+from cloudinary.models import CloudinaryField
 
 User = settings.AUTH_USER_MODEL
 
@@ -39,7 +40,7 @@ class ReportIssue(models.Model):
     )
     issue_type = models.ForeignKey(IssueType, on_delete=models.PROTECT, related_name="issues")
     description = models.TextField()
-    screenshot = models.ImageField(upload_to="support/screenshots/%Y/%m/", blank=True, null=True)
+    screenshot = CloudinaryField('image', blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

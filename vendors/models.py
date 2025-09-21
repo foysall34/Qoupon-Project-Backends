@@ -52,8 +52,9 @@ class ModifierGroup(models.Model):
     def __str__(self):
         return self.name
 
+# Product table 
 class Deal(models.Model):
-    """
+    """ 
      Menu part ******************
     """
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='deals_user' , null= True)
@@ -74,12 +75,13 @@ class Deal(models.Model):
 
 # create deals ---------------------------------------
 
+# offer table
 
 class Create_Deal(models.Model):
     class RedemptionType(models.TextChoices):
         DELIVERY = 'DELIVERY', 'Delivery'
         PICKUP = 'PICKUP', 'Pickup'
-        BOTH = 'BOTH', 'Delivery & Pickup'
+        # BOTH = 'BOTH', 'Delivery & Pickup'
 
   
 
@@ -100,7 +102,6 @@ class Create_Deal(models.Model):
     
     max_coupons_total = models.PositiveIntegerField(verbose_name="Max Coupons For This Deal")
     max_coupons_per_customer = models.PositiveIntegerField(default=1, verbose_name="Max Coupons Per Customer")
-
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
 

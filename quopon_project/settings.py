@@ -49,6 +49,7 @@ INSTALLED_APPS = [
     'support',
     'order',
     'drf_yasg',
+    'QrCodeApp',
       
     
 ]

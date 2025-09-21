@@ -120,6 +120,50 @@ def clear_cart(request):
     cart = get_object_or_404(Cart, user=request.user)
     cart.clear()
     return Response({'message': 'Cart cleared'})
+  
+@api_view(['DELETE'])
+@permission_classes([IsAuthenticated])
+def delete_cart_item(request, item_id):
+    """Delete specific item from cart"""
+    print(item_id)
+    cart_item = get_object_or_404(CartItem, id=item_id, cart__user=request.user)
+    cart_item.delete()
+    return Response({'message': 'Item removed from cart'}, status=status.HTTP_200_OK)
+ 
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def increment_cart_item(request, item_id):
+    """Increase quantity of cart item by 1"""
+    cart_item = get_object_or_404(CartItem, id=item_id, cart__user=request.user)
+    cart_item.quantity += 1
+    cart_item.save()
+    return Response({
+        'message': 'Quantity increased',
+        'quantity': cart_item.quantity,
+        'item_total': str(cart_item.item_total),
+        'cart_total': str(cart_item.cart.final_total)
+    })
+ 
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def decrement_cart_item(request, item_id):
+    """Decrease quantity of cart item by 1"""
+    cart_item = get_object_or_404(CartItem, id=item_id, cart__user=request.user)
+    if cart_item.quantity > 1:
+        cart_item.quantity -= 1
+        cart_item.save()
+        message = 'Quantity decreased'
+    else:
+        cart_item.delete()
+        message = 'Item removed from cart'
+    
+    cart = Cart.objects.get(user=request.user)
+    return Response({
+        'message': message,
+        'quantity': cart_item.quantity if cart_item.quantity > 1 else 0,
+        'item_total': str(cart_item.item_total) if cart_item.quantity > 1 else "0.00",
+        'cart_total': str(cart.final_total)
+    })
  
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])

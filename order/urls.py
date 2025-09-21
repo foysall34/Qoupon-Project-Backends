@@ -1,11 +1,14 @@
 from django.urls import path
 from . import views
-
+ 
 urlpatterns = [
     # Cart URLs
     path('cart/', views.get_cart, name='cart-detail'),
     path('cart/add/', views.add_to_cart, name='add-to-cart'),
     path('cart/item/<int:item_id>/', views.update_cart_item, name='update-cart-item'),
+    path('cart/item/<int:item_id>/delete/', views.delete_cart_item, name='delete-cart-item'),
+    path('cart/item/<int:item_id>/increment/', views.increment_cart_item, name='increment-cart-item'),
+    path('cart/item/<int:item_id>/decrement/', views.decrement_cart_item, name='decrement-cart-item'),
     path('cart/clear/', views.clear_cart, name='clear-cart'),
     path('cart/checkout/calculate/', views.calculate_checkout, name='calculate-checkout'),
     

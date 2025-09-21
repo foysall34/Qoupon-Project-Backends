@@ -9,39 +9,45 @@ from decimal import Decimal
 import logging
 from mollie.api.client import Client
 from mollie.api.error import UnprocessableEntityError, Error as MollieApiError
-
+ 
 logger = logging.getLogger(__name__)
 from .models import (
-    Cart, CartItem, CartDeal, Order, OrderItem, 
+    Cart, CartItem, CartDeal, Order, OrderItem,
     AppliedDeal, OrderTracking
 )
 from .serializers import (
-    OrderSerializer, OrderItemSerializer, 
+    OrderSerializer, OrderItemSerializer,
     AppliedDealSerializer, OrderTrackingSerializer
 )
-from discover.models import MenuItem
-from vendors.models import Create_Deal
+from vendors.models import Deal, Create_Deal
 import json
-
+ 
 # Cart Views
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def get_cart(request):
     """Get user's cart with items and applied deal"""
     cart, _ = Cart.objects.get_or_create(user=request.user)
+    # Calculate discount if a deal is applied
+    applied_discount = Decimal('0.00')
+    if hasattr(cart, 'applied_deal'):
+        applied_discount = cart.applied_deal.calculated_discount
+ 
     data = {
         'id': cart.id,
         'total_items': cart.total_items,
         'subtotal': str(cart.subtotal),
         'delivery_fee': str(cart.delivery_fee),
-        'total_discount': str(cart.total_discount),
+        'total_discount': str(applied_discount),
         'final_total': str(cart.final_total),
         'items': [{
             'id': item.id,
-            'menu_item': {
-                'id': item.menu_item.id,
-                'name': item.menu_item.name,
-                'price': str(item.menu_item.price)
+            'deal': {
+                'id': item.deal.id,
+                'title': item.deal.title,
+                'description': item.deal.description,
+                'price': str(item.deal.price),
+                'image': item.deal.image.url if item.deal.image else None
             },
             'quantity': item.quantity,
             'special_instructions': item.special_instructions,
@@ -58,12 +64,12 @@ def get_cart(request):
         }
     
     return Response(data)
-
+ 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def add_to_cart(request):
-    """Add item to cart or update quantity if already exists"""
-    menu_item_id = request.data.get('menu_item_id')
+    """Add deal to cart or update quantity if already exists"""
+    deal_id = request.data.get('menu_item_id')
     quantity = int(request.data.get('quantity', 1))
     special_instructions = request.data.get('special_instructions', '')
     
@@ -73,28 +79,19 @@ def add_to_cart(request):
             status=status.HTTP_400_BAD_REQUEST
         )
     
-    menu_item = get_object_or_404(MenuItem, id=menu_item_id)
+    deal = get_object_or_404(Deal, id=deal_id)
     cart, _ = Cart.objects.get_or_create(user=request.user)
     
     cart_item, created = CartItem.objects.get_or_create(
         cart=cart,
-        menu_item=menu_item,
+        deal=deal,
         defaults={
             'quantity': quantity,
             'special_instructions': special_instructions
         }
     )
-    
-    if not created:
-        cart_item.quantity += quantity
-        cart_item.special_instructions = special_instructions
-        cart_item.save()
-    
-    return Response({
-        'message': 'Item added to cart',
-        'cart_total': str(cart.final_total)
-    })
-
+    return Response({'message': 'Item added to cart','cart_total':str(cart.final_total)}, status=status.HTTP_201_CREATED)
+ 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def update_cart_item(request, item_id):
@@ -115,7 +112,7 @@ def update_cart_item(request, item_id):
         cart_item.save()
     
     return Response({'message': 'Cart updated'})
-
+ 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def clear_cart(request):
@@ -123,7 +120,7 @@ def clear_cart(request):
     cart = get_object_or_404(Cart, user=request.user)
     cart.clear()
     return Response({'message': 'Cart cleared'})
-
+ 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def calculate_checkout(request):
@@ -156,7 +153,7 @@ def calculate_checkout(request):
         })
     
     return Response(checkout_data)
-
+ 
 # Order Views
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
@@ -165,7 +162,7 @@ def order_list(request):
     orders = Order.objects.filter(user=request.user).order_by('-created_at')
     serializer = OrderSerializer(orders, many=True)
     return Response(serializer.data)
-
+ 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def order_detail(request, order_id):
@@ -173,7 +170,7 @@ def order_detail(request, order_id):
     order = get_object_or_404(Order, order_id=order_id, user=request.user)
     serializer = OrderSerializer(order)
     return Response(serializer.data)
-
+ 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 @transaction.atomic
@@ -205,8 +202,8 @@ def create_order(request):
     # Create cart snapshot
     cart_data = {
         'items': [{
-            'menu_item_id': item.menu_item.id,
-            'name': item.menu_item.name,
+            'deal_id': item.deal.id,
+            'title': item.deal.title,
             'quantity': item.quantity,
             'unit_price': str(item.unit_price),
             'total': str(item.item_total),
@@ -246,12 +243,12 @@ def create_order(request):
     for cart_item in cart.cart_items.all():
         OrderItem.objects.create(
             order=order,
-            menu_item=cart_item.menu_item,
+            menu_item=cart_item.deal,
             quantity=cart_item.quantity,
-            unit_price=cart_item.unit_price,
+            unit_price=cart_item.deal.price,
             total_price=cart_item.item_total,
-            item_name=cart_item.menu_item.name,
-            item_description=cart_item.menu_item.description,
+            item_name=cart_item.deal.title,
+            item_description=cart_item.deal.description,
             special_instructions=cart_item.special_instructions
         )
     
@@ -274,7 +271,7 @@ def create_order(request):
     
     serializer = OrderSerializer(order)
     return Response(serializer.data, status=status.HTTP_201_CREATED)
-
+ 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def process_payment(request, order_id):
@@ -296,7 +293,7 @@ def process_payment(request, order_id):
             {'error': 'Payment service unavailable'},
             status=status.HTTP_503_SERVICE_UNAVAILABLE
         )
-
+ 
     try:
         payment_data = {
             'amount': {
@@ -310,7 +307,7 @@ def process_payment(request, order_id):
                 'order_id': str(order.order_id)
             }
         }
-
+ 
         payment = mollie_client.payments.create(payment_data)
         
         # Store payment ID in order for webhook processing
@@ -320,7 +317,7 @@ def process_payment(request, order_id):
         return Response({
             'checkout_url': payment.checkout_url
         }, status=status.HTTP_201_CREATED)
-
+ 
     except UnprocessableEntityError as e:
         logger.error(f"Mollie payment creation error: {e}")
         return Response(
@@ -339,7 +336,7 @@ def process_payment(request, order_id):
             {'error': 'An unexpected error occurred'},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
-
+ 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def cancel_order(request, order_id):
@@ -362,7 +359,7 @@ def cancel_order(request, order_id):
     )
     
     return Response({'message': 'Order cancelled successfully'})
-
+ 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def order_tracking(request, order_id):
@@ -371,7 +368,7 @@ def order_tracking(request, order_id):
     tracking = order.tracking_history.all()
     serializer = OrderTrackingSerializer(tracking, many=True)
     return Response(serializer.data)
-
+ 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def get_delivery_qr(request, order_id):
@@ -393,7 +390,7 @@ def get_delivery_qr(request, order_id):
     return Response({
         'delivery_code': order.delivery_code
     })
-
+ 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 @api_view(['POST'])
@@ -403,7 +400,7 @@ def mollie_webhook(request):
     payment_id = request.POST.get('id')
     if not payment_id:
         return Response({'error': 'No payment ID provided'}, status=status.HTTP_400_BAD_REQUEST)
-
+ 
     try:
         mollie_client = Client()
         mollie_client.set_api_key(settings.MOLLIE_API_KEY)
@@ -469,7 +466,7 @@ def mollie_webhook(request):
     except Exception as e:
         logger.error(f"Error processing Mollie webhook: {e}")
         return Response(status=status.HTTP_200_OK)  # Always return 200 to Mollie
-
+ 
 def verify_delivery(request, order_id):
     """Verify delivery using QR code"""
     order = get_object_or_404(Order, order_id=order_id)

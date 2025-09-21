@@ -2,11 +2,10 @@ from django.db import models
 from django.conf import settings
 from django.utils import timezone
 from vendors.models import Create_Deal, Deal
-from discover.models import MenuItem
 from decimal import Decimal
 import uuid
 import secrets
-
+ 
 class Cart(models.Model):
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='shopping_cart')
     created_at = models.DateTimeField(auto_now_add=True)
@@ -39,26 +38,26 @@ class Cart(models.Model):
     
     def __str__(self):
         return f"Cart for {self.user.email}"
-
+ 
 class CartItem(models.Model):
     cart = models.ForeignKey(Cart, on_delete=models.CASCADE, related_name='cart_items')
-    menu_item = models.ForeignKey(MenuItem, on_delete=models.CASCADE, related_name='order_cart_items')
+    deal = models.ForeignKey(Deal, on_delete=models.CASCADE, related_name='order_cart_items')
     quantity = models.PositiveIntegerField(default=1)
     special_instructions = models.TextField(blank=True)
     added_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-
+ 
     @property
     def unit_price(self):
-        return self.menu_item.price
-
+        return self.deal.price
+ 
     @property
     def item_total(self):
         return self.unit_price * self.quantity
-
+ 
     def __str__(self):
-        return f"{self.quantity}x {self.menu_item.name}"
-
+        return f"{self.quantity}x {self.deal.title}"
+ 
 class CartDeal(models.Model):
     cart = models.OneToOneField(Cart, on_delete=models.CASCADE, related_name='applied_deal')
     deal = models.ForeignKey(Create_Deal, on_delete=models.CASCADE)
@@ -82,7 +81,7 @@ class CartDeal(models.Model):
     
     def __str__(self):
         return f"{self.deal.title} applied to {self.cart}"
-
+ 
 class Order(models.Model):
     class OrderStatus(models.TextChoices):
         PENDING_PAYMENT = 'PENDING_PAYMENT', 'Pending Payment'
@@ -98,7 +97,7 @@ class Order(models.Model):
         PAID = 'PAID', 'Paid'
         FAILED = 'FAILED', 'Failed'
         REFUNDED = 'REFUNDED', 'Refunded'
-
+ 
     class DeliveryType(models.TextChoices):
         PICKUP = 'PICKUP', 'Pickup'
         DELIVERY = 'DELIVERY', 'Delivery'
@@ -106,10 +105,10 @@ class Order(models.Model):
     class OrderType(models.TextChoices):
         STANDARD = 'STANDARD', 'Standard Order'
         SCHEDULED = 'SCHEDULED', 'Scheduled Order'
-
+ 
     order_id = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='user_orders')
-    cart_snapshot = models.JSONField(null=True, blank=True, 
+    cart_snapshot = models.JSONField(null=True, blank=True,
         help_text="Snapshot of cart data at time of order")
     
     # Order Status
@@ -133,7 +132,7 @@ class Order(models.Model):
     
     # Order Type and Scheduling
     order_type = models.CharField(max_length=10, choices=OrderType.choices, default=OrderType.STANDARD)
-    scheduled_datetime = models.DateTimeField(null=True, blank=True, 
+    scheduled_datetime = models.DateTimeField(null=True, blank=True,
         help_text="Required if order_type is SCHEDULED. When the order should be delivered/ready for pickup.")
     
     # Additional Info
@@ -141,11 +140,11 @@ class Order(models.Model):
     estimated_delivery_time = models.DateTimeField(null=True, blank=True)
     
     # Delivery Verification
-    delivery_code = models.CharField(max_length=6, unique=True, null=True, blank=True, 
+    delivery_code = models.CharField(max_length=6, unique=True, null=True, blank=True,
                                    help_text="Unique code for delivery QR verification")
     delivery_code_created_at = models.DateTimeField(null=True, blank=True)
     delivery_code_used = models.BooleanField(default=False)
-
+ 
     def generate_delivery_code(self):
         """Generate a unique 6-digit delivery verification code"""
         while True:
@@ -162,7 +161,7 @@ class Order(models.Model):
                 self.subtotal = self.cart.sub_total_price
                 self.delivery_fee = self.cart.delivery_charges
                 self.total_amount = self.cart.in_total_price - self.discount_amount
-
+ 
         # Generate delivery code when order status changes to PREPARING
         if self.pk:  # Existing order
             old_order = Order.objects.get(pk=self.pk)
@@ -173,13 +172,13 @@ class Order(models.Model):
                     self.delivery_code_used = False
         
         super().save(*args, **kwargs)
-
+ 
     def __str__(self):
         return f"Order {self.order_id} - {self.user.email}"
-
+ 
 class OrderItem(models.Model):
     order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='items')
-    menu_item = models.ForeignKey(MenuItem, on_delete=models.SET_NULL, null=True)
+    deal = models.ForeignKey(Deal, on_delete=models.SET_NULL, null=True)
     quantity = models.PositiveIntegerField()
     unit_price = models.DecimalField(max_digits=10, decimal_places=2)
     total_price = models.DecimalField(max_digits=10, decimal_places=2)
@@ -190,16 +189,16 @@ class OrderItem(models.Model):
     special_instructions = models.TextField(blank=True)
     
     def save(self, *args, **kwargs):
-        if not self.pk and self.menu_item:  # New order item
-            self.item_name = self.menu_item.name
-            self.item_description = self.menu_item.description
-            self.unit_price = self.menu_item.price
+        if not self.pk and self.deal:  # New order item
+            self.item_name = self.deal.title
+            self.item_description = self.deal.description
+            self.unit_price = self.deal.price
             self.total_price = self.unit_price * self.quantity
         super().save(*args, **kwargs)
-
+ 
     def __str__(self):
         return f"{self.quantity}x {self.item_name} in Order {self.order.order_id}"
-
+ 
 class AppliedDeal(models.Model):
     order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='applied_deals')
     deal = models.ForeignKey(Create_Deal, on_delete=models.SET_NULL, null=True)
@@ -214,18 +213,18 @@ class AppliedDeal(models.Model):
             self.deal_title = self.deal.title
             self.deal_description = self.deal.description
         super().save(*args, **kwargs)
-
+ 
     def __str__(self):
         return f"{self.deal_title} applied to Order {self.order.order_id}"
-
+ 
 class OrderTracking(models.Model):
     order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='tracking_history')
     status = models.CharField(max_length=20, choices=Order.OrderStatus.choices)
     timestamp = models.DateTimeField(auto_now_add=True)
     note = models.TextField(blank=True)
-
+ 
     class Meta:
         ordering = ['-timestamp']
-
+ 
     def __str__(self):
         return f"Order {self.order.order_id} - {self.status} at {self.timestamp}"

@@ -73,6 +73,7 @@ class CategorySerializer(serializers.ModelSerializer):
     class Meta:
         model = Vendor_Category
         fields = ['id', 'category_title']
+        ref_name = "VendorCategory"
 
 class ModifierGroupSerializer(serializers.ModelSerializer):
     class Meta:

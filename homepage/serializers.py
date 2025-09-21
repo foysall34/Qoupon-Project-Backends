@@ -17,6 +17,7 @@ class CategorySerializer(serializers.ModelSerializer):
         extra_kwargs = {
             'image': {'write_only': True}
         }
+        ref_name = "HomepageCategory"
 
     # fucntion of make url 
     def get_image_url(self, obj):

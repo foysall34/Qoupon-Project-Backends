@@ -4,6 +4,13 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django.shortcuts import get_object_or_404
 from django.db import transaction
+from django.conf import settings
+from decimal import Decimal
+import logging
+from mollie.api.client import Client
+from mollie.api.error import UnprocessableEntityError, Error as MollieApiError
+
+logger = logging.getLogger(__name__)
 from .models import (
     Cart, CartItem, CartDeal, Order, OrderItem, 
     AppliedDeal, OrderTracking
@@ -271,7 +278,7 @@ def create_order(request):
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def process_payment(request, order_id):
-    """Process payment and update order status to RECEIVED if successful"""
+    """Process payment using Mollie payment gateway"""
     order = get_object_or_404(Order, order_id=order_id, user=request.user)
     
     if order.status != Order.OrderStatus.PENDING_PAYMENT:
@@ -280,35 +287,57 @@ def process_payment(request, order_id):
             status=status.HTTP_400_BAD_REQUEST
         )
     
-    # Here you would integrate with your payment gateway
-    # For now, we'll simulate a successful payment
-    payment_successful = True  # This would come from payment gateway
-    
-    if payment_successful:
-        order.status = Order.OrderStatus.RECEIVED
-        order.payment_status = Order.PaymentStatus.PAID
+    try:
+        mollie_client = Client()
+        mollie_client.set_api_key(settings.MOLLIE_API_KEY)
+    except Exception as e:
+        logger.error(f"Mollie API initialization error: {e}")
+        return Response(
+            {'error': 'Payment service unavailable'},
+            status=status.HTTP_503_SERVICE_UNAVAILABLE
+        )
+
+    try:
+        payment_data = {
+            'amount': {
+                'currency': 'EUR',
+                'value': f"{float(order.total_amount):.2f}"
+            },
+            'description': f'Order #{order.order_id}',
+            'redirectUrl': f'{settings.FRONTEND_URL}/orders/{order.order_id}/confirmation/',
+            'webhookUrl': f'{settings.BACKEND_URL}/api/orders/mollie-webhook/',
+            'metadata': {
+                'order_id': str(order.order_id)
+            }
+        }
+
+        payment = mollie_client.payments.create(payment_data)
+        
+        # Store payment ID in order for webhook processing
+        order.payment_id = payment.id
         order.save()
         
-        # Create tracking entry
-        OrderTracking.objects.create(
-            order=order,
-            status=Order.OrderStatus.RECEIVED,
-            note='Payment successful, order received'
-        )
-        
-        # Clear the cart after successful payment
-        cart = Cart.objects.filter(user=request.user).first()
-        if cart:
-            cart.clear()
-        
         return Response({
-            'message': 'Payment successful, order received',
-            'order': OrderSerializer(order).data
-        })
-    else:
+            'checkout_url': payment.checkout_url
+        }, status=status.HTTP_201_CREATED)
+
+    except UnprocessableEntityError as e:
+        logger.error(f"Mollie payment creation error: {e}")
         return Response(
-            {'error': 'Payment failed'},
-            status=status.HTTP_400_BAD_REQUEST
+            {'error': f'Invalid payment data: {e.detail}'},
+            status=status.HTTP_422_UNPROCESSABLE_ENTITY
+        )
+    except MollieApiError as e:
+        logger.error(f"Mollie API error: {e}")
+        return Response(
+            {'error': 'Payment service error'},
+            status=status.HTTP_503_SERVICE_UNAVAILABLE
+        )
+    except Exception as e:
+        logger.error(f"Unexpected error in payment processing: {e}")
+        return Response(
+            {'error': 'An unexpected error occurred'},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 
 @api_view(['POST'])
@@ -362,13 +391,85 @@ def get_delivery_qr(request, order_id):
         )
     
     return Response({
-        'delivery_code': order.delivery_code,
-        'qr_data': order.delivery_code,
-        'created_at': order.delivery_code_created_at
+        'delivery_code': order.delivery_code
     })
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
+@api_view(['POST'])
+@permission_classes([])  # No authentication required for webhook
+def mollie_webhook(request):
+    """Handle Mollie payment status webhook"""
+    payment_id = request.POST.get('id')
+    if not payment_id:
+        return Response({'error': 'No payment ID provided'}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        mollie_client = Client()
+        mollie_client.set_api_key(settings.MOLLIE_API_KEY)
+        payment = mollie_client.payments.get(payment_id)
+        
+        # Find the order associated with this payment
+        order = Order.objects.filter(payment_id=payment_id).first()
+        if not order:
+            logger.error(f"Order not found for payment {payment_id}")
+            return Response(status=status.HTTP_200_OK)  # Always return 200 to Mollie
+        
+        if payment.is_paid():
+            # Payment was successful
+            order.status = Order.OrderStatus.RECEIVED
+            order.payment_status = Order.PaymentStatus.PAID
+            order.save()
+            
+            # Create tracking entry
+            OrderTracking.objects.create(
+                order=order,
+                status=Order.OrderStatus.RECEIVED,
+                note='Payment successful, order received'
+            )
+            
+            # Clear the user's cart
+            Cart.objects.filter(user=order.user).first().clear()
+            
+        elif payment.is_canceled():
+            order.status = Order.OrderStatus.CANCELLED
+            order.payment_status = Order.PaymentStatus.CANCELLED
+            order.save()
+            
+            OrderTracking.objects.create(
+                order=order,
+                status=Order.OrderStatus.CANCELLED,
+                note='Payment was cancelled'
+            )
+            
+        elif payment.is_expired():
+            order.status = Order.OrderStatus.CANCELLED
+            order.payment_status = Order.PaymentStatus.FAILED
+            order.save()
+            
+            OrderTracking.objects.create(
+                order=order,
+                status=Order.OrderStatus.CANCELLED,
+                note='Payment expired'
+            )
+            
+        elif payment.is_failed():
+            order.status = Order.OrderStatus.CANCELLED
+            order.payment_status = Order.PaymentStatus.FAILED
+            order.save()
+            
+            OrderTracking.objects.create(
+                order=order,
+                status=Order.OrderStatus.CANCELLED,
+                note='Payment failed'
+            )
+        
+        return Response(status=status.HTTP_200_OK)
+        
+    except Exception as e:
+        logger.error(f"Error processing Mollie webhook: {e}")
+        return Response(status=status.HTTP_200_OK)  # Always return 200 to Mollie
+
 def verify_delivery(request, order_id):
     """Verify delivery using QR code"""
     order = get_object_or_404(Order, order_id=order_id)

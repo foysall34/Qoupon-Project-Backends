@@ -1,11 +1,11 @@
 from django.db import models
 from django.conf import settings
+from django.utils import timezone
 from vendors.models import Create_Deal, Deal
 from discover.models import MenuItem
 from decimal import Decimal
 import uuid
 import secrets
-import hashlib
 
 class Cart(models.Model):
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='shopping_cart')
@@ -42,7 +42,7 @@ class Cart(models.Model):
 
 class CartItem(models.Model):
     cart = models.ForeignKey(Cart, on_delete=models.CASCADE, related_name='cart_items')
-    menu_item = models.ForeignKey(MenuItem, on_delete=models.CASCADE)
+    menu_item = models.ForeignKey(MenuItem, on_delete=models.CASCADE, related_name='order_cart_items')
     quantity = models.PositiveIntegerField(default=1)
     special_instructions = models.TextField(blank=True)
     added_at = models.DateTimeField(auto_now_add=True)
@@ -141,19 +141,16 @@ class Order(models.Model):
     estimated_delivery_time = models.DateTimeField(null=True, blank=True)
     
     # Delivery Verification
-    delivery_code = models.CharField(max_length=12, unique=True, null=True, blank=True, 
+    delivery_code = models.CharField(max_length=6, unique=True, null=True, blank=True, 
                                    help_text="Unique code for delivery QR verification")
     delivery_code_created_at = models.DateTimeField(null=True, blank=True)
     delivery_code_used = models.BooleanField(default=False)
 
     def generate_delivery_code(self):
-        """Generate a unique, secure delivery verification code"""
+        """Generate a unique 6-digit delivery verification code"""
         while True:
-            # Generate a random string and hash it
-            random_string = secrets.token_hex(16)
-            hash_object = hashlib.sha256(random_string.encode())
-            # Take first 12 characters of the hash
-            code = hash_object.hexdigest()[:12].upper()
+            # Generate a random 6-digit number
+            code = ''.join(secrets.choice('0123456789') for _ in range(6))
             
             # Check if code is unique
             if not Order.objects.filter(delivery_code=code).exists():

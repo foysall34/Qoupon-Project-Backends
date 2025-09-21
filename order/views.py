@@ -19,7 +19,8 @@ from .serializers import (
     OrderSerializer, OrderItemSerializer,
     AppliedDealSerializer, OrderTrackingSerializer
 )
-from vendors.models import Deal, Create_Deal
+from vendors.models import Deal, Create_Deal, Business_profile
+from rest_framework.exceptions import PermissionDenied
 import json
  
 # Cart Views
@@ -92,10 +93,9 @@ def add_to_cart(request):
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def update_cart_item(request, item_id):
-    """Update cart item quantity or special instructions"""
+    """Update cart item quantity"""
     cart_item = get_object_or_404(CartItem, id=item_id, cart__user=request.user)
     quantity = request.data.get('quantity')
-    special_instructions = request.data.get('special_instructions')
     
     if quantity is not None:
         if quantity > 0:
@@ -103,10 +103,6 @@ def update_cart_item(request, item_id):
             cart_item.save()
         else:
             cart_item.delete()
-    
-    if special_instructions is not None:
-        cart_item.special_instructions = special_instructions
-        cart_item.save()
     
     return Response({'message': 'Cart updated'})
  
@@ -247,8 +243,7 @@ def create_order(request):
             'title': item.deal.title,
             'quantity': item.quantity,
             'unit_price': str(item.unit_price),
-            'total': str(item.item_total),
-            'special_instructions': item.special_instructions
+            'total': str(item.item_total)
         } for item in cart.cart_items.all()],
         'subtotal': str(subtotal),
         'delivery_fee': str(delivery_fee),
@@ -290,8 +285,7 @@ def create_order(request):
             unit_price=cart_item.deal.price,
             total_price=cart_item.item_total,
             item_name=cart_item.deal.title,
-            item_description=cart_item.deal.description,
-            special_instructions=cart_item.special_instructions
+            item_description=cart_item.deal.description
         )
     
     # Create applied deal if exists
@@ -417,20 +411,27 @@ def get_delivery_qr(request, order_id):
     """Get delivery QR code for an order"""
     order = get_object_or_404(Order, order_id=order_id, user=request.user)
     
-    if order.status not in [Order.OrderStatus.PREPARING, Order.OrderStatus.OUT_FOR_DELIVERY]:
+    if order.status == Order.OrderStatus.CANCELLED:
         return Response(
-            {'error': 'QR code is only available for orders in preparation or out for delivery'},
+            {'error': 'QR code is not available for cancelled orders'},
             status=status.HTTP_400_BAD_REQUEST
         )
     
-    if not order.delivery_code:
+    if order.delivery_code_used:
         return Response(
-            {'error': 'Delivery code not generated yet'},
+            {'error': 'QR code has already been used'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    if not order.qr_code:
+        return Response(
+            {'error': 'QR code not generated yet'},
             status=status.HTTP_400_BAD_REQUEST
         )
     
     return Response({
-        'delivery_code': order.delivery_code
+        'delivery_code': order.delivery_code,
+        'qr_code_url': order.qr_code.image.url if order.qr_code else None
     })
  
 @api_view(['POST'])
@@ -509,8 +510,91 @@ def mollie_webhook(request):
         logger.error(f"Error processing Mollie webhook: {e}")
         return Response(status=status.HTTP_200_OK)  # Always return 200 to Mollie
  
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def update_order_status(request, order_id):
+    """Update order status - Only vendors can update their own order statuses"""
+    
+    # Check if user is a vendor (has a business profile)
+    try:
+        vendor_profile = Business_profile.objects.get(owner=request.user)
+    except Business_profile.DoesNotExist:
+        raise PermissionDenied("Only vendors can update order status")
+    
+    # Get the order
+    order = get_object_or_404(Order, order_id=order_id)
+    
+    # Check if any items in the order belong to this vendor
+    vendor_items = order.items.filter(deal__user=request.user)
+    if not vendor_items.exists():
+        raise PermissionDenied("You can only update orders for your own deals")
+    
+    new_status = request.data.get('status')
+    if not new_status:
+        return Response(
+            {'error': 'Status is required'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    if new_status not in dict(Order.OrderStatus.choices):
+        return Response(
+            {'error': 'Invalid status'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    # Only allow specific status changes for vendors
+    allowed_transitions = {
+        Order.OrderStatus.RECEIVED: [Order.OrderStatus.PREPARING],
+        Order.OrderStatus.PREPARING: [Order.OrderStatus.READY_FOR_PICKUP, Order.OrderStatus.OUT_FOR_DELIVERY]
+    }
+    
+    if order.status not in allowed_transitions or new_status not in allowed_transitions[order.status]:
+        return Response(
+            {'error': f'Vendors can only change status:\n'
+                     f'- From RECEIVED to PREPARING\n'
+                     f'- From PREPARING to READY_FOR_PICKUP or OUT_FOR_DELIVERY\n'
+                     f'- Order completion requires QR code verification'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    # For READY_FOR_PICKUP/OUT_FOR_DELIVERY, validate based on delivery type
+    if new_status in [Order.OrderStatus.READY_FOR_PICKUP, Order.OrderStatus.OUT_FOR_DELIVERY]:
+        if new_status == Order.OrderStatus.READY_FOR_PICKUP and order.delivery_type != Order.DeliveryType.PICKUP:
+            return Response(
+                {'error': 'Cannot set to READY_FOR_PICKUP for delivery orders'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        if new_status == Order.OrderStatus.OUT_FOR_DELIVERY and order.delivery_type != Order.DeliveryType.DELIVERY:
+            return Response(
+                {'error': 'Cannot set to OUT_FOR_DELIVERY for pickup orders'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+    
+    if order.status in valid_transitions and new_status not in valid_transitions[order.status]:
+        return Response(
+            {'error': f'Cannot change status from {order.status} to {new_status}'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    order.status = new_status
+    order.save()
+    
+    # Create tracking entry
+    OrderTracking.objects.create(
+        order=order,
+        status=new_status,
+        note=request.data.get('note', f'Order status updated to {new_status} by {vendor_profile.name}')
+    )
+    
+    return Response({
+        'message': 'Order status updated successfully',
+        'status': new_status
+    })
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
 def verify_delivery(request, order_id):
-    """Verify delivery using QR code"""
+    """Verify delivery using QR code - This is the only way to complete an order"""
     order = get_object_or_404(Order, order_id=order_id)
     delivery_code = request.data.get('delivery_code')
     
@@ -520,9 +604,15 @@ def verify_delivery(request, order_id):
             status=status.HTTP_400_BAD_REQUEST
         )
     
+    if order.status == Order.OrderStatus.CANCELLED:
+        return Response(
+            {'error': 'Cannot verify delivery for cancelled orders'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
     if order.status not in [Order.OrderStatus.OUT_FOR_DELIVERY, Order.OrderStatus.READY_FOR_PICKUP]:
         return Response(
-            {'error': 'Order is not ready for delivery verification'},
+            {'error': 'Order must be in OUT_FOR_DELIVERY or READY_FOR_PICKUP status for verification'},
             status=status.HTTP_400_BAD_REQUEST
         )
     
@@ -538,7 +628,7 @@ def verify_delivery(request, order_id):
             status=status.HTTP_400_BAD_REQUEST
         )
     
-    # Mark delivery as verified
+    # Mark delivery as verified and complete the order
     order.delivery_code_used = True
     order.status = Order.OrderStatus.COMPLETED
     order.save()
@@ -547,10 +637,10 @@ def verify_delivery(request, order_id):
     OrderTracking.objects.create(
         order=order,
         status=Order.OrderStatus.COMPLETED,
-        note='Delivery verified via QR code'
+        note='Order completed - verified via QR code'
     )
     
     return Response({
-        'message': 'Delivery verified successfully',
+        'message': 'Delivery verified and order completed successfully',
         'order_status': order.status
     })

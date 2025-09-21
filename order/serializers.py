@@ -1,14 +1,20 @@
 from rest_framework import serializers
 from .models import Order, OrderItem, AppliedDeal, OrderTracking
 from discover.models import Cart, CartItem
+from QrCodeApp.models import QRCode
 from django.utils import timezone
 from datetime import timedelta
+
+class QRCodeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = QRCode
+        fields = ['id', 'data', 'image']
 
 class OrderItemSerializer(serializers.ModelSerializer):
     class Meta:
         model = OrderItem
         fields = ['id', 'menu_item', 'quantity', 'unit_price', 'total_price', 
-                 'item_name', 'item_description', 'special_instructions']
+                 'item_name', 'item_description']
         read_only_fields = ['unit_price', 'total_price', 'item_name', 'item_description']
 
 class AppliedDealSerializer(serializers.ModelSerializer):
@@ -27,6 +33,7 @@ class OrderSerializer(serializers.ModelSerializer):
     items = OrderItemSerializer(many=True, read_only=True)
     applied_deals = AppliedDealSerializer(many=True, read_only=True)
     tracking_history = OrderTrackingSerializer(many=True, read_only=True)
+    qr_code = QRCodeSerializer(read_only=True)
     
     class Meta:
         model = Order
@@ -36,7 +43,7 @@ class OrderSerializer(serializers.ModelSerializer):
             'subtotal', 'delivery_fee', 'discount_amount', 'total_amount',
             'delivery_address', 'delivery_postal_code', 'special_instructions',
             'note', 'estimated_delivery_time', 'items', 'applied_deals', 'tracking_history',
-            'created_at', 'updated_at'
+            'created_at', 'updated_at', 'delivery_code', 'delivery_code_used', 'qr_code'
         ]
         read_only_fields = [
             'order_id', 'subtotal', 'total_amount', 'created_at', 'updated_at',

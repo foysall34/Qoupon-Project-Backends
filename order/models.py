@@ -3,6 +3,7 @@ from django.conf import settings
 from django.utils import timezone
 from vendors.models import Create_Deal, Deal
 from decimal import Decimal
+from QrCodeApp.models import QRCode
 import uuid
 import secrets
  
@@ -145,6 +146,7 @@ class Order(models.Model):
                                    help_text="Unique code for delivery QR verification")
     delivery_code_created_at = models.DateTimeField(null=True, blank=True)
     delivery_code_used = models.BooleanField(default=False)
+    qr_code = models.OneToOneField(QRCode, on_delete=models.SET_NULL, null=True, blank=True, related_name='order')
  
     def generate_delivery_code(self):
         """Generate a unique 6-digit delivery verification code"""
@@ -162,15 +164,35 @@ class Order(models.Model):
                 self.subtotal = self.cart.sub_total_price
                 self.delivery_fee = self.cart.delivery_charges
                 self.total_amount = self.cart.in_total_price - self.discount_amount
+            
+            # Generate delivery code for new orders
+            if not self.delivery_code:
+                self.delivery_code = self.generate_delivery_code()
+                self.delivery_code_created_at = timezone.now()
  
-        # Generate delivery code when order status changes to PREPARING
         if self.pk:  # Existing order
             old_order = Order.objects.get(pk=self.pk)
-            if old_order.status != Order.OrderStatus.PREPARING and self.status == Order.OrderStatus.PREPARING:
-                if not self.delivery_code:  # Only generate if not already exists
+            
+            # Generate QR code when order status changes to RECEIVED
+            if old_order.status != self.OrderStatus.RECEIVED and self.status == self.OrderStatus.RECEIVED:
+                if not self.delivery_code:
                     self.delivery_code = self.generate_delivery_code()
                     self.delivery_code_created_at = timezone.now()
-                    self.delivery_code_used = False
+                if not self.qr_code and not self.delivery_code_used:
+                    from django.core.files.base import ContentFile
+                    import qrcode
+                    from io import BytesIO
+                    
+                    # Generate QR code using the delivery code
+                    qr = qrcode.make(self.delivery_code)
+                    buffer = BytesIO()
+                    qr.save(buffer, format="PNG")
+                    file_name = f"qr_{self.order_id}.png"
+                    
+                    # Create QRCode instance
+                    qr_code = QRCode(user=self.user, data=self.delivery_code)
+                    qr_code.image.save(file_name, ContentFile(buffer.getvalue()), save=True)
+                    self.qr_code = qr_code
         
         super().save(*args, **kwargs)
  

@@ -1,7 +1,7 @@
 
 from rest_framework import generics, permissions
-from .models import Business_profile , Business_profile_Category
-from .serializers import Business_profile_Serializer,Categories_Serializer ,BusinessProfileCategorySerializer,ImageSerializer
+from .models import Business_profile , Business_profile_Category, WishDeal
+from .serializers import Business_profile_Serializer,Categories_Serializer ,BusinessProfileCategorySerializer,ImageSerializer, WishDealSerializer
 from rest_framework.response import Response
 from rest_framework import generics, permissions, status
 from rest_framework.filters import SearchFilter
@@ -243,3 +243,48 @@ class ImageUploadView(APIView):
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         else:
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        
+
+class AllDealsView(APIView):
+    def get(self, request):
+        data = Create_Deal.objects.all()
+        serializer = Create_DealSerializer(data, many=True)
+        return Response(serializer.data)
+    
+
+
+class WishDealListCreateView(APIView):
+    permission_classes = [permissions.IsAuthenticated] 
+
+    def get(self, request):
+        """
+        GET: List all wish deals of the authenticated user
+        """
+        wish_deals = WishDeal.objects.filter(user=request.user)
+        serializer = WishDealSerializer(wish_deals, many=True)
+        return Response(serializer.data)
+
+    def post(self, request):
+        """
+        POST: Add a new wish deal for the authenticated user
+        """
+        data = request.data
+        data['user'] = request.user.id 
+        serializer = WishDealSerializer(data=data)
+
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def delete(self, request, pk=None):
+        """
+        DELETE: Remove a wish deal from the authenticated user's wishlist
+        """
+        try:
+            # Find the wish deal
+            wish_deal = WishDeal.objects.get(id=pk, user=request.user)
+            wish_deal.delete()
+            return Response({"message": "Delete successful"}, status=status.HTTP_204_NO_CONTENT)
+        except WishDeal.DoesNotExist:
+            return Response({"detail": "Not found."}, status=status.HTTP_404_NOT_FOUND)

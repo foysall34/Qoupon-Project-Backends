@@ -1,6 +1,6 @@
 
 from rest_framework import serializers
-from .models import Business_profile, Business_profile_Category
+from .models import Business_profile, Business_profile_Category, WishDeal
 from .models import Deal, Vendor_Category, ModifierGroup
 from django_filters.rest_framework import DjangoFilterBackend 
 from django.contrib.auth import get_user_model
@@ -250,3 +250,10 @@ class ImageSerializer(serializers.ModelSerializer):
         representation = super().to_representation(instance)
         representation['image'] = instance.image.url
         return representation
+    
+
+class WishDealSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = WishDeal
+        fields = ['id', 'user', 'deal', 'added_at']
+        read_only_fields = ['id', 'added_at']

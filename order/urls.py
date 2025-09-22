@@ -22,4 +22,6 @@ urlpatterns = [
     path('orders/<uuid:order_id>/delivery-qr/', views.get_delivery_qr, name='delivery-qr'),
     path('orders/<uuid:order_id>/verify-delivery/', views.verify_delivery, name='verify-delivery'),
     path('orders/<uuid:order_id>/status/', views.update_order_status, name='update-order-status'),
+    
+    path('webhook/mollie/', views.mollie_webhook, name='mollie-webhook'),
 ]

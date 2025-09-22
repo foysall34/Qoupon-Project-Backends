@@ -340,7 +340,7 @@ def process_payment(request, order_id):
             },
             'description': f'Order #{order.order_id}',
             'redirectUrl': redirect_url if redirect_url else f'https://dummy.org/orders/{order.order_id}/confirmation/',
-            'webhookUrl': f'https://dummy.org/api/orders/mollie-webhook/',
+            'webhookUrl': request.build_absolute_uri('/order/webhook/mollie/'),
             'metadata': {
                 'order_id': str(order.order_id)
             }
@@ -437,9 +437,7 @@ def get_delivery_qr(request, order_id):
     })
  
 @api_view(['POST'])
-@permission_classes([IsAuthenticated])
-@api_view(['POST'])
-@permission_classes([])  # No authentication required for webhook
+@permission_classes([])  # No authentication required for webhook - this is called by Mollie's servers
 def mollie_webhook(request):
     """Handle Mollie payment status webhook"""
     payment_id = request.POST.get('id')

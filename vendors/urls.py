@@ -2,6 +2,7 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from .views import  CreateStoreViewPatch,AllBusinessProfilesListView,ImageUploadView,BusinessProfileCategoryViewSet,categoryItemListView,DealViewSet, CategoryViewSet, ModifierGroupViewSet , CreateStoreView ,CreateDealViewSet
+from . import views
 
 
 router = DefaultRouter()
@@ -19,5 +20,8 @@ urlpatterns = [
     path('businessh-profile/manage/', CreateStoreViewPatch.as_view(), name='store-detail'),
     path('mymenu-category/', categoryItemListView.as_view(), name='menu-item-list'),
     path('upload/', ImageUploadView.as_view(), name='image-upload'),
+    path('all-deals/', views.AllDealsView.as_view(), name='all-deals-list'),
+    path('wish-deals/', views.WishDealListCreateView.as_view(), name='wish-deals-list-create'),
+    path('wish-deals/<int:pk>/', views.WishDealListCreateView.as_view(), name='wish-deals-delete'),  # Add DELETE URL
 
 ]

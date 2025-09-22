@@ -125,3 +125,15 @@ class DeliveryCost(models.Model):
 
 class Image(models.Model):
     image = CloudinaryField('image')
+
+
+class WishDeal(models.Model):
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='wish_deals')
+    deal = models.ForeignKey(Create_Deal, on_delete=models.CASCADE, related_name='wish_deals')
+    added_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('user', 'deal')
+
+    def __str__(self):
+        return f"{self.user.username} - {self.deal.title}"

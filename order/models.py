@@ -97,6 +97,9 @@ class Order(models.Model):
         PAID = 'PAID', 'Paid'
         FAILED = 'FAILED', 'Failed'
         REFUNDED = 'REFUNDED', 'Refunded'
+        CANCELLED = 'CANCELLED', 'Cancelled'
+
+    payment_id = models.CharField(max_length=255, null=True, blank=True, unique=True)
  
     class DeliveryType(models.TextChoices):
         PICKUP = 'PICKUP', 'Pickup'
@@ -209,7 +212,7 @@ class OrderItem(models.Model):
     item_description = models.TextField(blank=True)
     item_image = models.ImageField(upload_to='order_items/', blank=True)
     note = models.TextField(blank=True)
-    
+
     def save(self, *args, **kwargs):
         if not self.pk and self.deal:  # New order item
             self.item_name = self.deal.title

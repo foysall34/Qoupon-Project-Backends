@@ -207,7 +207,8 @@ class OrderItem(models.Model):
     # Store item details at time of order
     item_name = models.CharField(max_length=255)
     item_description = models.TextField(blank=True)
-    special_instructions = models.TextField(blank=True)
+    item_image = models.ImageField(upload_to='order_items/', blank=True)
+    note = models.TextField(blank=True)
     
     def save(self, *args, **kwargs):
         if not self.pk and self.deal:  # New order item

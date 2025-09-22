@@ -11,11 +11,18 @@ class QRCodeSerializer(serializers.ModelSerializer):
         fields = ['id', 'data', 'image']
 
 class OrderItemSerializer(serializers.ModelSerializer):
+    item_image = serializers.SerializerMethodField()
+ 
+    def get_item_image(self, obj):
+        if hasattr(obj.deal, 'image'):
+            return obj.deal.image.url if obj.deal.image else None
+        return None
+ 
     class Meta:
         model = OrderItem
-        fields = ['id', 'deal', 'quantity', 'unit_price', 'total_price', 
-                 'item_name', 'item_description']
-        read_only_fields = ['unit_price', 'total_price', 'item_name', 'item_description']
+        fields = ['id', 'deal', 'quantity', 'unit_price', 'total_price',
+                 'item_name', 'item_description', 'item_image']
+        read_only_fields = ['unit_price', 'total_price', 'item_name', 'item_description', 'item_image']
 
 class AppliedDealSerializer(serializers.ModelSerializer):
     class Meta:
@@ -78,9 +85,6 @@ class OrderSerializer(serializers.ModelSerializer):
             if not data.get('delivery_address'):
                 raise serializers.ValidationError(
                     {"delivery_address": "Delivery address is required for delivery orders."})
-            if not data.get('delivery_postal_code'):
-                raise serializers.ValidationError(
-                    {"delivery_postal_code": "Postal code is required for delivery orders."})
 
         cart = data.get('cart')
         if not cart:

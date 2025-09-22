@@ -243,7 +243,8 @@ def create_order(request):
             'title': item.deal.title,
             'quantity': item.quantity,
             'unit_price': str(item.unit_price),
-            'total': str(item.item_total)
+            'total': str(item.item_total),
+            'image': item.deal.image.url if item.deal.image else None
         } for item in cart.cart_items.all()],
         'subtotal': str(subtotal),
         'delivery_fee': str(delivery_fee),
@@ -258,49 +259,15 @@ def create_order(request):
             'discount_amount': str(discount_amount)
         }
     
-    # Validate required fields
-    delivery_type = request.data.get('delivery_type')
-    if not delivery_type or delivery_type not in dict(Order.DeliveryType.choices):
-        return Response(
-            {'error': 'Valid delivery_type (PICKUP or DELIVERY) is required'},
-            status=status.HTTP_400_BAD_REQUEST
-        )
-
-    order_type = request.data.get('order_type', Order.OrderType.STANDARD)
-    if order_type not in dict(Order.OrderType.choices):
-        return Response(
-            {'error': 'Invalid order_type. Must be STANDARD or SCHEDULED'},
-            status=status.HTTP_400_BAD_REQUEST
-        )
-
-    # Validate scheduled datetime for scheduled orders
-    if order_type == Order.OrderType.SCHEDULED:
-        scheduled_datetime = request.data.get('scheduled_datetime')
-        if not scheduled_datetime:
-            return Response(
-                {'error': 'scheduled_datetime is required for scheduled orders'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-    # Validate delivery address for delivery orders
-    if delivery_type == Order.DeliveryType.DELIVERY:
-        if not request.data.get('delivery_address'):
-            return Response(
-                {'error': 'delivery_address is required for delivery orders'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
     # Create order with PENDING_PAYMENT status
     order = Order.objects.create(
         user=request.user,
         cart_snapshot=cart_data,
-        delivery_type=delivery_type,
-        order_type=order_type,
+        delivery_type=request.data.get('delivery_type'),
+        order_type=request.data.get('order_type'),
         scheduled_datetime=request.data.get('scheduled_datetime'),
         delivery_address=request.data.get('delivery_address'),
-        delivery_address_latitude=request.data.get('delivery_address_latitude'),
-        delivery_address_longitude=request.data.get('delivery_address_longitude'),
-        special_instructions=request.data.get('special_instructions', ''),
+        special_instructions=request.data.get('special_instructions'),
         note=request.data.get('note', ''),
         subtotal=subtotal,
         delivery_fee=delivery_fee,
@@ -318,7 +285,8 @@ def create_order(request):
             unit_price=cart_item.deal.price,
             total_price=cart_item.item_total,
             item_name=cart_item.deal.title,
-            item_description=cart_item.deal.description
+            item_description=cart_item.deal.description,
+            item_image=cart_item.deal.image.url if cart_item.deal.image else None
         )
     
     # Create applied deal if exists
@@ -346,6 +314,7 @@ def create_order(request):
 def process_payment(request, order_id):
     """Process payment using Mollie payment gateway"""
     order = get_object_or_404(Order, order_id=order_id, user=request.user)
+    redirect_url = request.data.get('redirect_url')
     
     if order.status != Order.OrderStatus.PENDING_PAYMENT:
         return Response(
@@ -370,8 +339,8 @@ def process_payment(request, order_id):
                 'value': f"{float(order.total_amount):.2f}"
             },
             'description': f'Order #{order.order_id}',
-            'redirectUrl': f'{settings.FRONTEND_URL}/orders/{order.order_id}/confirmation/',
-            'webhookUrl': f'{settings.BACKEND_URL}/api/orders/mollie-webhook/',
+            'redirectUrl': redirect_url if redirect_url else f'https://dummy.org/orders/{order.order_id}/confirmation/',
+            'webhookUrl': f'https://dummy.org/api/orders/mollie-webhook/',
             'metadata': {
                 'order_id': str(order.order_id)
             }
@@ -603,7 +572,7 @@ def update_order_status(request, order_id):
                 status=status.HTTP_400_BAD_REQUEST
             )
     
-    if order.status in valid_transitions and new_status not in valid_transitions[order.status]:
+    if order.status not in allowed_transitions or new_status not in allowed_transitions[order.status]:
         return Response(
             {'error': f'Cannot change status from {order.status} to {new_status}'},
             status=status.HTTP_400_BAD_REQUEST

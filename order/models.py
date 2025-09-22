@@ -194,6 +194,10 @@ class Order(models.Model):
                     qr_code = QRCode(user=self.user, data=self.delivery_code)
                     qr_code.image.save(file_name, ContentFile(buffer.getvalue()), save=True)
                     self.qr_code = qr_code
+            if old_order.status != self.OrderStatus.CANCELLED and self.status == self.OrderStatus.CANCELLED:
+                self.qr_code.delete()
+            if old_order.status != self.OrderStatus.COMPLETED and self.status == self.OrderStatus.COMPLETED:
+                self.qr_code.delete()
         
         super().save(*args, **kwargs)
  

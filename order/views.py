@@ -644,3 +644,32 @@ def verify_delivery(request, order_id):
         'message': 'Delivery verified and order completed successfully',
         'order_status': order.status
     })
+
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def update_estimated_delivery_time(request, order_id):
+    """Update estimated delivery time for an order"""
+    order = get_object_or_404(Order, order_id=order_id)
+ 
+    if order.status not in [Order.OrderStatus.PREPARING, Order.OrderStatus.READY_FOR_PICKUP, Order.OrderStatus.OUT_FOR_DELIVERY]:
+        return Response(
+            {'error': 'Cannot update estimated delivery time for this order status'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+ 
+    estimated_delivery_time = request.data.get('estimated_delivery_time')
+    if not estimated_delivery_time:
+        return Response(
+            {'error': 'Estimated delivery time is required'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+ 
+    order.estimated_delivery_time = estimated_delivery_time
+    order.save()
+ 
+    return Response({
+        'message': 'Estimated delivery time updated successfully',
+        'estimated_delivery_time': estimated_delivery_time
+    })

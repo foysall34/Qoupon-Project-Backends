@@ -24,4 +24,5 @@ urlpatterns = [
     path('orders/<uuid:order_id>/status/', views.update_order_status, name='update-order-status'),
     
     path('webhook/mollie/', views.mollie_webhook, name='mollie-webhook'),
+    path('orders/<uuid:order_id>/estimated_delivery_time/', views.update_estimated_delivery_time, name='update-estimated-delivery-time'),
 ]

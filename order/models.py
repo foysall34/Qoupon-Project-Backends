@@ -142,7 +142,7 @@ class Order(models.Model):
     # Additional Info
     special_instructions = models.TextField(blank=True, null=True)
     note = models.TextField(blank=True, null=True)
-    estimated_delivery_time = models.DateTimeField(null=True, blank=True)
+    estimated_delivery_time = models.DurationField(null=True, blank=True)
     
     # Delivery Verification
     delivery_code = models.CharField(max_length=6, unique=True, null=True, blank=True,

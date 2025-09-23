@@ -162,45 +162,53 @@ class Order(models.Model):
                 return code
     
     def save(self, *args, **kwargs):
-        if not self.pk:  # New order
-            # Amounts are now set in the create_order view
-            pass
-            
-            # Generate delivery code for new orders
+        is_new = self.pk is None
+        old_status = None
+        
+        if not is_new:
+            old_status = Order.objects.only("status").get(pk=self.pk).status
+ 
+        # New order → generate delivery code if missing
+        if is_new and not self.delivery_code:
+            self.delivery_code = self.generate_delivery_code()
+            self.delivery_code_created_at = timezone.now()
+ 
+        # Status changed to RECEIVED → generate QR code only if it doesn't exist
+        if (
+            old_status
+            and old_status != self.OrderStatus.RECEIVED
+            and self.status == self.OrderStatus.RECEIVED
+        ):
             if not self.delivery_code:
                 self.delivery_code = self.generate_delivery_code()
                 self.delivery_code_created_at = timezone.now()
+            if not self.qr_code and not self.delivery_code_used:
+                from django.core.files.base import ContentFile
+                import qrcode
+                from io import BytesIO
  
-        if self.pk:  # Existing order
-            old_order = Order.objects.get(pk=self.pk)
-            
-            # Generate QR code when order status changes to RECEIVED
-            if old_order.status != self.OrderStatus.RECEIVED and self.status == self.OrderStatus.RECEIVED:
-                if not self.delivery_code:
-                    self.delivery_code = self.generate_delivery_code()
-                    self.delivery_code_created_at = timezone.now()
-                if not self.qr_code and not self.delivery_code_used:
-                    from django.core.files.base import ContentFile
-                    import qrcode
-                    from io import BytesIO
-                    
-                    # Generate QR code using the delivery code
-                    qr = qrcode.make(self.delivery_code)
-                    buffer = BytesIO()
-                    qr.save(buffer, format="PNG")
-                    file_name = f"qr_{self.order_id}.png"
-                    
-                    # Create QRCode instance
-                    qr_code = QRCode(user=self.user, data=self.delivery_code)
-                    qr_code.save()  # Save the QRCode instance first
-                    qr_code.image.save(file_name, ContentFile(buffer.getvalue()), save=True)
-                    self.qr_code = qr_code
-            if old_order.status != self.OrderStatus.CANCELLED and self.status == self.OrderStatus.CANCELLED:
+                qr = qrcode.make(self.delivery_code)
+                buffer = BytesIO()
+                qr.save(buffer, format="PNG")
+                file_name = f"qr_{self.order_id}.png"
+ 
+                qr_code = QRCode(user=self.user, data=self.delivery_code)
+                qr_code.save()
+                qr_code.image.save(file_name, ContentFile(buffer.getvalue()), save=True)
+                self.qr_code = qr_code
+ 
+        # Status changed to CANCELLED or COMPLETED → delete QR code (if exists)
+        if (
+            old_status
+            and old_status not in [self.OrderStatus.CANCELLED, self.OrderStatus.COMPLETED]
+            and self.status in [self.OrderStatus.CANCELLED, self.OrderStatus.COMPLETED]
+        ):
+            if self.qr_code:
                 self.qr_code.delete()
-            if old_order.status != self.OrderStatus.COMPLETED and self.status == self.OrderStatus.COMPLETED:
-                self.qr_code.delete()
-        
+                self.qr_code = None
+ 
         super().save(*args, **kwargs)
+ 
  
     def __str__(self):
         return f"Order {self.order_id} - {self.user.email}"

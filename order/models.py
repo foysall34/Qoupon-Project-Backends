@@ -192,6 +192,7 @@ class Order(models.Model):
                     
                     # Create QRCode instance
                     qr_code = QRCode(user=self.user, data=self.delivery_code)
+                    qr_code.save()  # Save the QRCode instance first
                     qr_code.image.save(file_name, ContentFile(buffer.getvalue()), save=True)
                     self.qr_code = qr_code
             if old_order.status != self.OrderStatus.CANCELLED and self.status == self.OrderStatus.CANCELLED:

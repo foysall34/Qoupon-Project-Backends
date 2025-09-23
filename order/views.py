@@ -558,17 +558,19 @@ def update_order_status(request, order_id):
         )
     
     # For READY_FOR_PICKUP/OUT_FOR_DELIVERY, validate based on delivery type
-    if new_status in [Order.OrderStatus.READY_FOR_PICKUP, Order.OrderStatus.OUT_FOR_DELIVERY]:
-        if new_status == Order.OrderStatus.READY_FOR_PICKUP and order.delivery_type != Order.DeliveryType.PICKUP:
+    if new_status == Order.OrderStatus.READY_FOR_PICKUP:
+        if order.delivery_type != Order.DeliveryType.PICKUP:
             return Response(
-                {'error': 'Cannot set to READY_FOR_PICKUP for delivery orders'},
+                {'error': 'READY_FOR_PICKUP status is only valid for pickup orders'},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        if new_status == Order.OrderStatus.OUT_FOR_DELIVERY and order.delivery_type != Order.DeliveryType.DELIVERY:
-            return Response(
-                {'error': 'Cannot set to OUT_FOR_DELIVERY for pickup orders'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+ 
+        elif new_status == Order.OrderStatus.OUT_FOR_DELIVERY:
+            if order.delivery_type != Order.DeliveryType.DELIVERY:
+                return Response(
+                    {'error': 'OUT_FOR_DELIVERY status is only valid for delivery orders'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
     
     if order.status not in allowed_transitions or new_status not in allowed_transitions[order.status]:
         return Response(
@@ -673,3 +675,32 @@ def update_estimated_delivery_time(request, order_id):
         'message': 'Estimated delivery time updated successfully',
         'estimated_delivery_time': estimated_delivery_time
     })
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def vendor_orders(request):
+    """Get all orders for a vendor"""
+    try:
+        vendor_profile = Business_profile.objects.get(owner=request.user)
+    except Business_profile.DoesNotExist:
+        raise PermissionDenied("Only vendors can access orders")
+
+    # Get all orders that have items from this vendor
+    orders = Order.objects.filter(items__deal__user=request.user).distinct()
+    serializer = OrderSerializer(orders, many=True)
+    return Response(serializer.data)
+ 
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def vendor_order_detail(request, order_id):
+    """Get a single order for a vendor"""
+    try:
+        vendor_profile = Business_profile.objects.get(owner=request.user)
+    except Business_profile.DoesNotExist:
+        raise PermissionDenied("Only vendors can access orders")
+
+    # Get the order only if it has items from this vendor
+    order = get_object_or_404(Order, order_id=order_id, items__deal__user=request.user)
+    serializer = OrderSerializer(order)
+    return Response(serializer.data)
+ 

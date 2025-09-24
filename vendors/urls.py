@@ -21,7 +21,11 @@ urlpatterns = [
     path('mymenu-category/', categoryItemListView.as_view(), name='menu-item-list'),
     path('upload/', ImageUploadView.as_view(), name='image-upload'),
     path('all-deals/', views.AllDealsView.as_view(), name='all-deals-list'),
+    path('all-deals/<int:id>/', views.ALlDealsDetailsView.as_view(), name='all-deals-detail'),
+
     path('wish-deals/', views.WishDealListCreateView.as_view(), name='wish-deals-list-create'),
     path('wish-deals/<int:pk>/', views.WishDealListCreateView.as_view(), name='wish-deals-delete'),  # Add DELETE URL
 
-]
+    path('qr/deals/<int:id>/', views.DealByIDView.as_view(), name='deal'),
+
+]       

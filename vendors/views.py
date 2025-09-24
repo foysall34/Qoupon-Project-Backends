@@ -180,7 +180,7 @@ class CreateDealViewSet(viewsets.ModelViewSet):
 
         # --- Generate QR code ---
         # 1. Construct QR URL (base + deal id)
-        base_url = "https://intensely-optimal-unicorn.ngrok-free.app/vendors/deals/"   # <--- replace with your base URL
+        base_url = "https://intensely-optimal-unicorn.ngrok-free.app/vendors/all-deals/"   # <--- replace with your base URL
         qr_data = f"{base_url}{deal.id}/"
 
         # 2. Generate QR code
@@ -251,7 +251,26 @@ class AllDealsView(APIView):
         serializer = Create_DealSerializer(data, many=True)
         return Response(serializer.data)
     
+class ALlDealsDetailsView(APIView):
+    def get(self, request, id):
+        try:
+            deal = Create_Deal.objects.get(id=id)
+            serializer = Create_DealSerializer(deal)
+            return Response(serializer.data)
+        except Create_Deal.DoesNotExist:
+            return Response({"detail": "Not found."}, status=status.HTTP_404_NOT_FOUND)
+    
 
+class DealByIDView(APIView):
+    permission_classes = [permissions.AllowAny]  
+
+    def get(self, request, id):
+        try:
+            deal = Create_Deal.objects.get(id=id)
+            serializer = Create_DealSerializer(deal)
+            return Response(serializer.data)
+        except Create_Deal.DoesNotExist:
+            return Response({"detail": "Not found."}, status=status.HTTP_404_NOT_FOUND)
 
 class WishDealListCreateView(APIView):
     permission_classes = [permissions.IsAuthenticated] 
@@ -288,3 +307,19 @@ class WishDealListCreateView(APIView):
             return Response({"message": "Delete successful"}, status=status.HTTP_204_NO_CONTENT)
         except WishDeal.DoesNotExist:
             return Response({"detail": "Not found."}, status=status.HTTP_404_NOT_FOUND)
+        
+
+class VendorDealListView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        """
+        GET: List all deals of the authenticated vendor
+        """
+        try:
+            business_profile = Business_profile.objects.get(owner=request.user)
+            deals = Create_Deal.objects.filter(user=business_profile)
+            serializer = Create_DealSerializer(deals, many=True)
+            return Response(serializer.data)
+        except Business_profile.DoesNotExist:
+            return Response({"detail": "Business profile not found."}, status=status.HTTP_404_NOT_FOUND)

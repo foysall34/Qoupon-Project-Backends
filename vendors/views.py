@@ -310,16 +310,19 @@ class WishDealListCreateView(APIView):
         
 
 class VendorDealListView(APIView):
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.AllowAny]
 
-    def get(self, request):
+    def get(self, request, vendor_id):
         """
-        GET: List all deals of the authenticated vendor
+        Return all deals created by a given vendor (user).
         """
-        try:
-            business_profile = Business_profile.objects.get(owner=request.user)
-            deals = Create_Deal.objects.filter(user=business_profile)
-            serializer = Create_DealSerializer(deals, many=True)
-            return Response(serializer.data)
-        except Business_profile.DoesNotExist:
-            return Response({"detail": "Business profile not found."}, status=status.HTTP_404_NOT_FOUND)
+        deals = Create_Deal.objects.filter(user_id=vendor_id)
+
+        if not deals.exists():
+            return Response(
+                {"detail": "No deals found for this vendor."}, 
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        serializer = Create_DealSerializer(deals, many=True, context={'request': request})
+        return Response(serializer.data, status=status.HTTP_200_OK)

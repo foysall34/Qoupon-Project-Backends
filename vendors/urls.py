@@ -27,5 +27,7 @@ urlpatterns = [
     path('wish-deals/<int:pk>/', views.WishDealListCreateView.as_view(), name='wish-deals-delete'),  # Add DELETE URL
 
     path('qr/deals/<int:id>/', views.DealByIDView.as_view(), name='deal'),
+    path('vendor/<int:vendor_id>/deals/', views.VendorDealListView.as_view(), name='vendor-deals-list'),
+
 
 ]       

@@ -41,6 +41,7 @@ INSTALLED_APPS = [
     'homepage',
     'discover',
     'vendors',
+    'notifications',
     # 3rd party
     'rest_framework',
     'cloudinary_storage', 

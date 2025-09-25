@@ -21,6 +21,7 @@ from .serializers import (
 )
 from vendors.models import Deal, Create_Deal, Business_profile
 from rest_framework.exceptions import PermissionDenied
+from notifications.utils import FirebaseNotification
 import json
  
 # Cart Views
@@ -306,6 +307,19 @@ def create_order(request):
         note='Order created, awaiting payment'
     )
     
+    # Send notification to customer
+    FirebaseNotification.send_to_user(
+        user=request.user,
+        title="Order Created",
+        body=f"Your order #{order.order_id} has been created and is awaiting payment",
+        data={
+            'order_id': str(order.order_id),
+            'status': order.status,
+            'type': 'order_created'
+        },
+        notification_type='order_status'
+    )
+
     serializer = OrderSerializer(order)
     return Response(serializer.data, status=status.HTTP_201_CREATED)
  
@@ -395,6 +409,37 @@ def cancel_order(request, order_id):
         status=Order.OrderStatus.CANCELLED,
         note=request.data.get('cancellation_reason', 'Order cancelled by user')
     )
+
+    # Send notification to customer
+    FirebaseNotification.send_to_user(
+        user=request.user,
+        title="Order Cancelled",
+        body=f"Your order #{order.order_id} has been cancelled",
+        data={
+            'order_id': str(order.order_id),
+            'status': Order.OrderStatus.CANCELLED,
+            'type': 'order_cancelled'
+        },
+        notification_type='order_status'
+    )
+
+    # Notify vendor(s)
+    for vendor_id in order.items.values_list('deal__user', flat=True).distinct():
+        try:
+            vendor = type(order.user).objects.get(id=vendor_id)
+            FirebaseNotification.send_to_user(
+                user=vendor,
+                title="Order Cancelled",
+                body=f"Order #{order.order_id} has been cancelled by the customer",
+                data={
+                    'order_id': str(order.order_id),
+                    'status': Order.OrderStatus.CANCELLED,
+                    'type': 'order_cancelled'
+                },
+                notification_type='order_status'
+            )
+        except Exception as e:
+            logger.error(f"Failed to send vendor notification: {e}")
     
     return Response({'message': 'Order cancelled successfully'})
  
@@ -470,6 +515,27 @@ def mollie_webhook(request):
             
             # Clear the user's cart
             Cart.objects.filter(user=order.user).first().clear()
+
+            # Send notification to customer
+            FirebaseNotification.send_payment_update(order, "successful")
+
+            # Notify vendor(s)
+            for vendor_id in order.items.values_list('deal__user', flat=True).distinct():
+                try:
+                    vendor = type(order.user).objects.get(id=vendor_id)
+                    FirebaseNotification.send_to_user(
+                        user=vendor,
+                        title="New Order Received",
+                        body=f"You have received a new order #{order.order_id}",
+                        data={
+                            'order_id': str(order.order_id),
+                            'status': order.status,
+                            'type': 'new_order'
+                        },
+                        notification_type='order_status'
+                    )
+                except Exception as e:
+                    logger.error(f"Failed to send vendor notification: {e}")
             
         elif payment.is_canceled():
             order.status = Order.OrderStatus.CANCELLED
@@ -481,6 +547,8 @@ def mollie_webhook(request):
                 status=Order.OrderStatus.CANCELLED,
                 note='Payment was cancelled'
             )
+
+            FirebaseNotification.send_payment_update(order, "cancelled")
             
         elif payment.is_expired():
             order.status = Order.OrderStatus.CANCELLED
@@ -587,6 +655,16 @@ def update_order_status(request, order_id):
         status=new_status,
         note=request.data.get('note', f'Order status updated to {new_status} by {vendor_profile.name}')
     )
+
+    # Send notification to customer
+    status_messages = {
+        Order.OrderStatus.PREPARING: 'is being prepared',
+        Order.OrderStatus.READY_FOR_PICKUP: 'is ready for pickup',
+        Order.OrderStatus.OUT_FOR_DELIVERY: 'is out for delivery'
+    }
+
+    if new_status in status_messages:
+        FirebaseNotification.send_order_status_update(order, status_messages[new_status])
     
     return Response({
         'message': 'Order status updated successfully',
@@ -641,6 +719,37 @@ def verify_delivery(request, order_id):
         status=Order.OrderStatus.COMPLETED,
         note='Order completed - verified via QR code'
     )
+
+    # Send notification to customer
+    FirebaseNotification.send_to_user(
+        user=order.user,
+        title="Order Completed",
+        body=f"Your order #{order.order_id} has been completed",
+        data={
+            'order_id': str(order.order_id),
+            'status': order.status,
+            'type': 'order_completed'
+        },
+        notification_type='order_status'
+    )
+
+    # Notify vendor(s)
+    for vendor_id in order.items.values_list('deal__user', flat=True).distinct():
+        try:
+            vendor = type(order.user).objects.get(id=vendor_id)
+            FirebaseNotification.send_to_user(
+                user=vendor,
+                title="Order Completed",
+                body=f"Order #{order.order_id} has been completed successfully",
+                data={
+                    'order_id': str(order.order_id),
+                    'status': order.status,
+                    'type': 'order_completed'
+                },
+                notification_type='order_status'
+            )
+        except Exception as e:
+            logger.error(f"Failed to send vendor notification: {e}")
     
     return Response({
         'message': 'Delivery verified and order completed successfully',

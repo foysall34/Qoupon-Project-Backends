@@ -22,3 +22,4 @@ media/
 # If you are using PyCharm
 .idea/
 # If you are using JetBrains IDEs
+/secrets/

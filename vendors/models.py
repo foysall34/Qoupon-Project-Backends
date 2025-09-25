@@ -2,6 +2,10 @@
 from django.db import models
 from django.conf import settings
 from cloudinary.models import CloudinaryField
+from notifications.utils import FirebaseNotification
+from django.contrib.auth import get_user_model
+
+User = get_user_model()
 
 class Business_profile_Category(models.Model):
     name = models.CharField(max_length=100, unique=True)

@@ -1,14 +1,16 @@
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
 from django.utils import timezone
 from django.contrib.auth import get_user_model
 
 from .models import FCMDevice, Notification
 from .utils import FirebaseNotification
+from firebase_admin import messaging
 
 @api_view(['POST'])
+@permission_classes([AllowAny])
 def test_notification(request):
     """Test endpoint to send a push notification to a specific user"""
     try:
@@ -20,6 +22,7 @@ def test_notification(request):
                 {'error': 'user_id is required'},
                 status=status.HTTP_400_BAD_REQUEST
             )
+        
         # Get the user
         try:
             User = get_user_model()
@@ -30,28 +33,82 @@ def test_notification(request):
                 status=status.HTTP_404_NOT_FOUND
             )
 
+        # Get user's active devices
+        devices = FCMDevice.objects.filter(user=user, active=True)
+        
+        if not devices.exists():
+            return Response(
+                {'error': 'No active devices found for this user'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
         # Create a test notification with timestamp
         current_time = timezone.now().strftime('%H:%M:%S')
-        test_data = {
-            'test_id': '123',
-            'timestamp': str(timezone.now()),
-            'type': 'test_notification'
-        }
+        
+        results = []
+        success_count = 0
+        
+        # Send to each device using the WORKING approach
+        for device in devices:
+            try:
+                message = messaging.Message(
+                    notification=messaging.Notification(
+                        title='Test FCM Notification',
+                        body=f'This is a test notification sent at {current_time}'
+                    ),
+                    data={
+                        'test_id': '123',
+                        'timestamp': str(timezone.now()),
+                        'type': 'test_notification'
+                    },
+                    token=device.registration_id
+                )
 
-        # Send notification directly using Firebase utils
-        FirebaseNotification.send_to_user(
-            user=user,
-            title=f"Test Notification",
-            body=f"This is a test notification sent at {current_time}",
-            data=test_data,
-            notification_type='system'
-        )
+                # This is the WORKING approach from your original test
+                response = messaging.send(message)
+                
+                results.append({
+                    'device_id': device.id,
+                    'device_type': device.type,
+                    'status': 'success',
+                    'firebase_message_id': response
+                })
+                success_count += 1
+                
+            except messaging.UnregisteredError:
+                # Deactivate invalid token
+                device.active = False
+                device.save()
+                results.append({
+                    'device_id': device.id,
+                    'device_type': device.type,
+                    'status': 'error',
+                    'error': 'Token not registered - device deactivated'
+                })
+                
+            except messaging.InvalidArgumentError as e:
+                results.append({
+                    'device_id': device.id,
+                    'device_type': device.type,
+                    'status': 'error',
+                    'error': f'Invalid argument: {str(e)}'
+                })
+                
+            except Exception as e:
+                results.append({
+                    'device_id': device.id,
+                    'device_type': device.type,
+                    'status': 'error',
+                    'error': str(e)
+                })
 
         return Response({
-            'message': 'Test notification sent successfully',
+            'message': f'Test completed: {success_count} successful, {len(devices) - success_count} failed',
             'sent_at': current_time,
             'user_id': user_id,
+            'results': results
         })
+        
     except Exception as e:
         return Response(
             {'error': f'Failed to send notification: {str(e)}'},

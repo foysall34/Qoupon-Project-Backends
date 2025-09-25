@@ -6,14 +6,14 @@ from django.utils import timezone
 from .models import FCMDevice, Notification
 
 # Initialize Firebase Admin with your credentials
-cred = credentials.Certificate(os.path.join(settings.BASE_DIR, 'secrets/quopon-8b833-firebase-adminsdk-fbsvc-d9570ee0f3.json'))
+cred = credentials.Certificate(os.path.join(settings.BASE_DIR, 'secrets/quopon-8b833-firebase-adminsdk-fbsvc-6e0ec809c2.json'))
 firebase_admin.initialize_app(cred)
 
 class FirebaseNotification:
     @staticmethod
     def send_to_user(user, title, body, data=None, notification_type='system'):
         """
-        Send notification to all active devices of a user
+        Send notification to all active devices of a user using single messages
         """
         if data is None:
             data = {}
@@ -35,46 +35,44 @@ class FirebaseNotification:
             notification.save()
             return False
 
-        # Prepare the message
-        message = messaging.MulticastMessage(
-            notification=messaging.Notification(
-                title=title,
-                body=body,
-            ),
-            data=data,
-            tokens=[device.registration_id for device in devices]
-        )
+        success_count = 0
+        failures = []
+        
+        # Send individual message to each device (like your working test)
+        for device in devices:
+            try:
+                # Create message identical to your working test endpoint
+                message = messaging.Message(
+                    notification=messaging.Notification(
+                        title=title,
+                        body=body,
+                    ),
+                    data=data,
+                    token=device.registration_id
+                )
+                print("device token:", device.registration_id)
 
-        try:
-            # Send the message
-            response = messaging.send_multicast(message)
-            
-            # Update notification status
-            notification.sent = True
-            notification.sent_at = timezone.now()
-            
-            if response.failure_count > 0:
-                # Some tokens failed
-                failures = []
-                for idx, result in enumerate(response.responses):
-                    if not result.success:
-                        error_info = f"Failed to send to {devices[idx].type}: {result.exception}"
-                        failures.append(error_info)
-                        
-                        # Deactivate failed tokens
-                        if 'registration-token-not-registered' in str(result.exception):
-                            devices[idx].active = False
-                            devices[idx].save()
+                # Send using the same method as your working test
+                response = messaging.send(message)
+                print(f"Successfully sent message to {device.type}: {response}")
+                success_count += 1
                 
-                notification.error = "; ".join(failures)
-            
-            notification.save()
-            return response.success_count > 0
+            except Exception as e:
+                error_info = f"Failed to send to {device.type}: {str(e)}"
+                failures.append(error_info)
+                
+                # Deactivate failed tokens
+                if 'registration-token-not-registered' in str(e):
+                    device.active = False
+                    device.save()
 
-        except Exception as e:
-            notification.error = str(e)
-            notification.save()
-            return False
+        # Update notification status
+        notification.sent = success_count > 0
+        notification.sent_at = timezone.now() if success_count > 0 else None
+        notification.error = "; ".join(failures) if failures else None
+        notification.save()
+
+        return success_count > 0
 
     @staticmethod
     def send_to_multiple_users(users, title, body, data=None, notification_type='system'):

@@ -5,18 +5,25 @@ from django.conf import settings
 from django.utils import timezone
 from .models import FCMDevice, Notification
 
-# Initialize Firebase Admin with your credentials
-cred = credentials.Certificate(os.path.join(settings.BASE_DIR, 'secrets/quopon-8b833-firebase-adminsdk-fbsvc-6e0ec809c2.json'))
-firebase_admin.initialize_app(cred)
+# Initialize Firebase only once
+if not firebase_admin._apps:
+    cred = credentials.Certificate(
+        os.path.join(settings.BASE_DIR, 'secrets/quopon-8b833-firebase-adminsdk-fbsvc-6e0ec809c2.json')
+    )
+    firebase_admin.initialize_app(cred)
+
 
 class FirebaseNotification:
     @staticmethod
     def send_to_user(user, title, body, data=None, notification_type='system'):
         """
-        Send notification to all active devices of a user using single messages
+        Send notification to all active devices of a user
         """
         if data is None:
             data = {}
+
+        # Cast all values to strings (Firebase requires string data)
+        data = {str(k): str(v) for k, v in data.items()}
 
         # Create notification record
         notification = Notification.objects.create(
@@ -29,7 +36,6 @@ class FirebaseNotification:
 
         # Get all active devices for the user
         devices = FCMDevice.objects.filter(user=user, active=True)
-        
         if not devices.exists():
             notification.error = "No active devices found"
             notification.save()
@@ -37,11 +43,9 @@ class FirebaseNotification:
 
         success_count = 0
         failures = []
-        
-        # Send individual message to each device (like your working test)
+
         for device in devices:
             try:
-                # Create message identical to your working test endpoint
                 message = messaging.Message(
                     notification=messaging.Notification(
                         title=title,
@@ -50,23 +54,21 @@ class FirebaseNotification:
                     data=data,
                     token=device.registration_id
                 )
-                print("device token:", device.registration_id)
-
-                # Send using the same method as your working test
                 response = messaging.send(message)
-                print(f"Successfully sent message to {device.type}: {response}")
+                print(f"Successfully sent to {device.type}: {response}")
                 success_count += 1
-                
+
             except Exception as e:
                 error_info = f"Failed to send to {device.type}: {str(e)}"
+                print(error_info)
                 failures.append(error_info)
-                
-                # Deactivate failed tokens
-                if 'registration-token-not-registered' in str(e):
+
+                # Deactivate invalid tokens
+                if 'registration-token-not-registered' in str(e).lower():
                     device.active = False
                     device.save()
 
-        # Update notification status
+        # Update notification record
         notification.sent = success_count > 0
         notification.sent_at = timezone.now() if success_count > 0 else None
         notification.error = "; ".join(failures) if failures else None

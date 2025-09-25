@@ -3,117 +3,90 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
 from django.utils import timezone
-from django.contrib.auth import get_user_model
 
 from .models import FCMDevice, Notification
 from .utils import FirebaseNotification
-from firebase_admin import messaging
+from django.contrib.auth import get_user_model
+from firebase_admin import messaging, exceptions as fb_exceptions
+
+User = get_user_model()
 
 @api_view(['POST'])
-@permission_classes([AllowAny])
+@permission_classes([AllowAny])  # ✅ safer than AllowAny
 def test_notification(request):
-    """Test endpoint to send a push notification to a specific user"""
+    """Send a test notification to all active devices of a user"""
+    user_id = request.data.get('user_id')
+
+    if not user_id:
+        return Response(
+            {'error': 'user_id is required'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
     try:
-        # Get required parameters
-        user_id = request.data.get('user_id')
-        
-        if not user_id:
-            return Response(
-                {'error': 'user_id is required'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
-        # Get the user
+        user = User.objects.get(id=user_id)
+    except User.DoesNotExist:
+        return Response(
+            {'error': 'User not found'},
+            status=status.HTTP_404_NOT_FOUND
+        )
+
+    devices = FCMDevice.objects.filter(user=user, active=True)
+    if not devices.exists():
+        return Response(
+            {'valid': False, 'message': 'No active devices found for this user'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    success = []
+    failures = []
+
+    for device in devices:
+        message = messaging.Message(
+            notification=messaging.Notification(
+                title="Test Notification",
+                body=f"Hello, this is a test notification!"
+            ),
+            data={'test': 'validation_check', 'timestamp': str(timezone.now())},
+            token=device.registration_id
+        )
+
         try:
-            User = get_user_model()
-            user = User.objects.get(id=user_id)
-        except User.DoesNotExist:
-            return Response(
-                {'error': 'User not found'},
-                status=status.HTTP_404_NOT_FOUND
-            )
+            response = messaging.send(message)
+            success.append({
+                'device_id': device.id,
+                'type': device.type,
+                'firebase_message_id': response
+            })
+        except fb_exceptions.FirebaseError as e:
+            error_code = getattr(e, 'code', None)
+            failures.append({
+                'device_id': device.id,
+                'type': device.type,
+                'error': str(e),
+                'code': error_code
+            })
 
-        # Get user's active devices
-        devices = FCMDevice.objects.filter(user=user, active=True)
-        
-        if not devices.exists():
-            return Response(
-                {'error': 'No active devices found for this user'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        # Create a test notification with timestamp
-        current_time = timezone.now().strftime('%H:%M:%S')
-        
-        results = []
-        success_count = 0
-        
-        # Send to each device using the WORKING approach
-        for device in devices:
-            try:
-                message = messaging.Message(
-                    notification=messaging.Notification(
-                        title='Test FCM Notification',
-                        body=f'This is a test notification sent at {current_time}'
-                    ),
-                    data={
-                        'test_id': '123',
-                        'timestamp': str(timezone.now()),
-                        'type': 'test_notification'
-                    },
-                    token=device.registration_id
-                )
-
-                # This is the WORKING approach from your original test
-                response = messaging.send(message)
-                
-                results.append({
-                    'device_id': device.id,
-                    'device_type': device.type,
-                    'status': 'success',
-                    'firebase_message_id': response
-                })
-                success_count += 1
-                
-            except messaging.UnregisteredError:
-                # Deactivate invalid token
+            # deactivate invalid token
+            if error_code == 'registration-token-not-registered':
                 device.active = False
                 device.save()
-                results.append({
-                    'device_id': device.id,
-                    'device_type': device.type,
-                    'status': 'error',
-                    'error': 'Token not registered - device deactivated'
-                })
-                
-            except messaging.InvalidArgumentError as e:
-                results.append({
-                    'device_id': device.id,
-                    'device_type': device.type,
-                    'status': 'error',
-                    'error': f'Invalid argument: {str(e)}'
-                })
-                
-            except Exception as e:
-                results.append({
-                    'device_id': device.id,
-                    'device_type': device.type,
-                    'status': 'error',
-                    'error': str(e)
-                })
+        except Exception as e:
+            failures.append({
+                'device_id': device.id,
+                'type': device.type,
+                'error': str(e)
+            })
 
-        return Response({
-            'message': f'Test completed: {success_count} successful, {len(devices) - success_count} failed',
-            'sent_at': current_time,
-            'user_id': user_id,
-            'results': results
-        })
-        
-    except Exception as e:
-        return Response(
-            {'error': f'Failed to send notification: {str(e)}'},
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR
-        )
+    return Response({
+        'user_id': user.id,
+        'success_count': len(success),
+        'failure_count': len(failures),
+        'success': success,
+        'failures': failures,
+        'checked_at': timezone.now().isoformat()
+    })
+
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
@@ -137,7 +110,7 @@ def register_device(request):
     device, created = FCMDevice.objects.get_or_create(
         user=request.user,
         registration_id=registration_id,
-        defaults={'type': device_type}
+        defaults={'type': device_type, 'active': True}
     )
 
     if not created:
@@ -149,6 +122,7 @@ def register_device(request):
         'message': 'Device registered successfully',
         'created': created
     })
+
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
@@ -176,13 +150,14 @@ def unregister_device(request):
             status=status.HTTP_404_NOT_FOUND
         )
 
+
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def get_notifications(request):
-    """Get user's notifications"""
+    """Get user's notifications (last 50)"""
     notifications = Notification.objects.filter(
         user=request.user
-    ).order_by('-created_at')[:50]  # Get last 50 notifications
+    ).order_by('-created_at')[:50]
 
     return Response([{
         'id': notif.id,
@@ -194,10 +169,11 @@ def get_notifications(request):
         'created_at': notif.created_at
     } for notif in notifications])
 
+
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def mark_notification_read(request, notification_id):
-    """Mark a notification as read"""
+    """Mark a single notification as read"""
     try:
         notification = Notification.objects.get(
             id=notification_id,
@@ -212,6 +188,7 @@ def mark_notification_read(request, notification_id):
             status=status.HTTP_404_NOT_FOUND
         )
 
+
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def mark_all_notifications_read(request):
@@ -220,5 +197,5 @@ def mark_all_notifications_read(request):
         user=request.user,
         read=False
     ).update(read=True)
-    
+
     return Response({'message': 'All notifications marked as read'})

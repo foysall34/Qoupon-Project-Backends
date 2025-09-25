@@ -3,9 +3,60 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from django.utils import timezone
+from django.contrib.auth import get_user_model
 
 from .models import FCMDevice, Notification
 from .utils import FirebaseNotification
+
+@api_view(['POST'])
+def test_notification(request):
+    """Test endpoint to send a push notification to a specific user"""
+    try:
+        # Get required parameters
+        user_id = request.data.get('user_id')
+        
+        if not user_id:
+            return Response(
+                {'error': 'user_id is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        # Get the user
+        try:
+            User = get_user_model()
+            user = User.objects.get(id=user_id)
+        except User.DoesNotExist:
+            return Response(
+                {'error': 'User not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        # Create a test notification with timestamp
+        current_time = timezone.now().strftime('%H:%M:%S')
+        test_data = {
+            'test_id': '123',
+            'timestamp': str(timezone.now()),
+            'type': 'test_notification'
+        }
+
+        # Send notification directly using Firebase utils
+        FirebaseNotification.send_to_user(
+            user=user,
+            title=f"Test Notification",
+            body=f"This is a test notification sent at {current_time}",
+            data=test_data,
+            notification_type='system'
+        )
+
+        return Response({
+            'message': 'Test notification sent successfully',
+            'sent_at': current_time,
+            'user_id': user_id,
+        })
+    except Exception as e:
+        return Response(
+            {'error': f'Failed to send notification: {str(e)}'},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])

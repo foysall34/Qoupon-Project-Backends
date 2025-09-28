@@ -1,7 +1,7 @@
 from django.contrib import admin
 
 # Register your models here.
-from .models import Business_profile, Business_profile_Category, Deal, Vendor_Category,ModifierGroup, Create_Deal,DeliveryCost, WishDeal
+from .models import Business_profile, Business_profile_Category, Deal, Vendor_Category,ModifierGroup, Create_Deal,DeliveryCost, WishDeal, DealTimeSlot, Create_Deal, DealTimeSlot
 
 
 class BusinessProfileCategoryAdmin(admin.ModelAdmin):
@@ -17,13 +17,13 @@ class BusinessProfileAdmin(admin.ModelAdmin):
     ordering = ('-created_at',)
 admin.site.register(Business_profile, BusinessProfileAdmin)
 
-class DealAdmin(admin.ModelAdmin):
-    list_display = ('id', 'title', 'discount_value', 'user', 'created_at')
-    search_fields = ('title', 'user__email')
-    list_filter = ('created_at',)
-    ordering = ('-created_at',)
+# class DealAdmin(admin.ModelAdmin):
+#     list_display = ('id', 'title', 'discount_value', 'user', 'created_at')
+#     search_fields = ('title', 'user__email')
+#     list_filter = ('created_at',)
+#     ordering = ('-created_at',)
 
-admin.site.register(Create_Deal, DealAdmin)
+# admin.site.register(Create_Deal, DealAdmin)
 
 class MenuItemAdmin(admin.ModelAdmin):
     list_display = ('id', 'title', 'description', 'price', 'category', 'created_at')
@@ -61,6 +61,35 @@ class WishDealAdmin(admin.ModelAdmin):
     list_filter = ('added_at',)
     ordering = ('-added_at',)
 admin.site.register(WishDeal, WishDealAdmin)
+
+
+class DealTimeSlotInline(admin.TabularInline):
+    model = DealTimeSlot
+    extra = 1  
+    fields = ['day', 'is_active', 'start_time', 'end_time'] 
+
+    def get_queryset(self, request):
+        queryset = super().get_queryset(request)
+        return queryset.order_by('day') 
+
+class DealAdmin(admin.ModelAdmin):
+    list_display = ('id', 'title', 'discount_value', 'user', 'created_at')
+    search_fields = ('title', 'user__email')
+    list_filter = ('created_at',)
+    ordering = ('-created_at',)
+    inlines = [DealTimeSlotInline]
+
+admin.site.register(Create_Deal, DealAdmin)
+
+
+@admin.register(DealTimeSlot)
+class DealTimeSlotAdmin(admin.ModelAdmin):
+    list_display = ('deal', 'day', 'is_active', 'start_time', 'end_time')
+    list_filter = ('day', 'is_active')  
+    search_fields = ('deal__title', 'day')  
+    ordering = ('deal', 'day')
+
+
 
 
 # admin.site.register(Create_Deal)

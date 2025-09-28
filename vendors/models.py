@@ -133,6 +133,18 @@ class Create_Deal(models.Model):
         verbose_name_plural = "Vendor's Deals"
 
 
+class DealTimeSlot(models.Model):
+    deal = models.ForeignKey(Create_Deal, on_delete=models.CASCADE)
+    day = models.CharField(max_length=20, choices=[('Mon', 'Monday'), ('Tue', 'Tuesday'), ('Wed', 'Wednesday'), ('Thu', 'Thursday'), ('Fri', 'Friday'), ('Sat', 'Saturday'), ('Sun', 'Sunday')])
+    is_active = models.BooleanField(default=False)
+    start_time = models.TimeField()
+    end_time = models.TimeField()
+
+    def __str__(self):
+        return f"{self.deal.title} - {self.day} - Active: {self.is_active}"
+        
+
+
 class DeliveryCost(models.Model):
     deal = models.ForeignKey(Create_Deal, on_delete=models.CASCADE,related_name='delivery_costs')
     zip_code = models.CharField(max_length=20)

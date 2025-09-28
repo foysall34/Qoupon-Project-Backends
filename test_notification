@@ -1,0 +1,82 @@
+import os
+import firebase_admin
+from firebase_admin import credentials, messaging
+
+# --- Configuration ---
+# REPLACE THIS with the actual path to your Firebase service account JSON file.
+# This file contains the "FCM secret" credentials that authorize your server
+# to send messages via Firebase.
+SERVICE_ACCOUNT_KEY_PATH = 'path/to/your/quopon-8b833-firebase-adminsdk-fbsvc-xxxxxx.json' # <--- IMPORTANT: Update this path!
+
+# --- Initialize Firebase Admin SDK ---
+def initialize_firebase():
+    if not firebase_admin._apps:
+        try:
+            # Check if the service account key file exists
+            if not os.path.exists(SERVICE_ACCOUNT_KEY_PATH):
+                raise FileNotFoundError(f"Service account key not found at: {SERVICE_ACCOUNT_KEY_PATH}")
+
+            cred = credentials.Certificate(SERVICE_ACCOUNT_KEY_PATH)
+            firebase_admin.initialize_app(cred)
+            print("Firebase Admin SDK initialized successfully!")
+        except Exception as e:
+            print(f"Error initializing Firebase Admin SDK: {e}")
+            print("Please ensure 'SERVICE_ACCOUNT_KEY_PATH' is correct and the file exists.")
+            exit(1) # Exit if initialization fails
+
+# --- Function to send a test notification ---
+def send_test_notification(device_token, title="Test Notification from Python", body="This is a test message from your Python script!", data=None):
+    if not firebase_admin._apps:
+        print("Firebase Admin SDK not initialized. Cannot send notification.")
+        return
+
+    if not device_token:
+        print("Error: Device token cannot be empty.")
+        return
+
+    if data is None:
+        data = {"test_key": "test_value", "source": "python_script"}
+
+    # FCM requires all data values to be strings
+    data_str = {str(k): str(v) for k, v in data.items()}
+
+    try:
+        message = messaging.Message(
+            notification=messaging.Notification(
+                title=title,
+                body=body,
+            ),
+            data=data_str,
+            token=device_token,
+        )
+
+        # Send the message
+        response = messaging.send(message)
+        print(f"\nSuccessfully sent message to token: {device_token}")
+        print(f"Response: {response}") # This will be the message ID
+        print("Check your device for the notification!")
+
+    except Exception as e:
+        print(f"\nError sending message: {e}")
+        # Common error: 'registration-token-not-registered' means the token is invalid or expired
+        if 'registration-token-not-registered' in str(e).lower():
+            print("Hint: The device token might be invalid or expired. Get a fresh token from your app.")
+        elif 'invalid-argument' in str(e).lower() and 'Malformed FCM registration token' in str(e):
+            print("Hint: The provided device token has an incorrect format.")
+
+
+# --- Main execution block ---
+if __name__ == "__main__":
+    initialize_firebase()
+
+    print("\n--- Firebase Cloud Messaging Test Script ---")
+    print("This script uses your Firebase Admin SDK credentials to send a notification.")
+
+    # Get device token from user input
+    user_device_token = input("Enter the FCM device token to send to (e.g., from your mobile app): ").strip()
+
+    if not user_device_token:
+        print("No device token provided. Exiting.")
+    else:
+        # You can customize the title, body, and data here if needed
+        send_test_notification(user_device_token)

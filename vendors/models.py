@@ -76,6 +76,10 @@ class Deal(models.Model):
     def __str__(self):
         return self.title
     
+    class Meta:
+        verbose_name = "Menu Item"
+        verbose_name_plural = "Menu Items"
+    
 
 # create deals ---------------------------------------
 
@@ -86,8 +90,13 @@ class Create_Deal(models.Model):
         DELIVERY = 'DELIVERY', 'Delivery'
         PICKUP = 'PICKUP', 'Pickup'
         # BOTH = 'BOTH', 'Delivery & Pickup'
-
-  
+    discount_percentage = {
+        "0": "0",
+        "5": "5",
+        "10": "10",
+        "25": "25",
+        "50": "50",
+    } 
 
   
     linked_menu_item = models.ForeignKey(Deal, on_delete=models.CASCADE, related_name='deals')
@@ -97,7 +106,8 @@ class Create_Deal(models.Model):
     image = CloudinaryField('deal_image')
     
     qrimage = models.ImageField(upload_to='deals_qr/', null=True, blank=True)
-    discount_value = models.DecimalField(max_digits=10, decimal_places=2, help_text="Percentage or fixed amount")
+    # discount_value = models.DecimalField(max_digits=10, decimal_places=2, help_text="Percentage or fixed amount")
+    discount_value = models.CharField(max_length=3, choices=discount_percentage)
 
     start_date = models.DateTimeField()
     end_date = models.DateTimeField()
@@ -111,6 +121,11 @@ class Create_Deal(models.Model):
 
     def __str__(self):
         return self.title
+    
+    class Meta:
+        verbose_name = "Vendor's Deal"
+        verbose_name_plural = "Vendor's Deals"
+
 
 class DeliveryCost(models.Model):
     deal = models.ForeignKey(Create_Deal, on_delete=models.CASCADE,related_name='delivery_costs')
@@ -140,4 +155,4 @@ class WishDeal(models.Model):
         unique_together = ('user', 'deal')
 
     def __str__(self):
-        return f"{self.user.username} - {self.deal.title}"
+        return f"{self.user} - {self.deal.title}"

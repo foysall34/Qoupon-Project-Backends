@@ -326,3 +326,62 @@ class VendorDealListView(APIView):
 
         serializer = Create_DealSerializer(deals, many=True, context={'request': request})
         return Response(serializer.data, status=status.HTTP_200_OK)
+
+class SendDealNotification(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, deal_id):
+        title = request.data.get("title")
+        body = request.data.get("body")
+
+        if not title or not body:
+            return Response(
+                {"detail": "Both 'title' and 'body' are required."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            deal = Create_Deal.objects.get(id=deal_id, user=request.user)
+        except Create_Deal.DoesNotExist:
+            return Response(
+                {"detail": "Deal not found."},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        # Build deal data payload
+        deal_data = {
+            "deal_id": str(deal.id),
+            "title": deal.title,
+            "discount_value": str(deal.discount_value),
+            "type": "new_deal"
+        }
+
+        # Exclude vendor users (those with a business profile)
+        from django.contrib.auth import get_user_model
+        User = get_user_model()
+        non_vendor_users = User.objects.exclude(
+            id__in=Business_profile.objects.values_list('owner_id', flat=True)
+        )
+
+        # Send notifications
+        success_count = 0
+        for user in non_vendor_users:
+            from notifications.utils import FirebaseNotification
+            if FirebaseNotification.send_to_user(
+                user=user,
+                title=title,
+                body=body,
+                data=deal_data,
+                notification_type="promotion"
+            ):
+                success_count += 1
+
+        return Response(
+            {
+                "detail": f"Notifications sent to {success_count} users.",
+                "deal_id": deal.id,
+                "sent": success_count > 0
+            },
+            status=status.HTTP_200_OK
+        )
+        

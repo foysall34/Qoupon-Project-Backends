@@ -28,6 +28,6 @@ urlpatterns = [
 
     path('qr/deals/<int:id>/', views.DealByIDView.as_view(), name='deal'),
     path('vendor/<int:vendor_id>/deals/', views.VendorDealListView.as_view(), name='vendor-deals-list'),
-
+    path('<int:deal_id>/send-notification/', views.SendDealNotification.as_view(), name='vendor-create-deals-list'),
 
 ]       

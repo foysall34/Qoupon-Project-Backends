@@ -96,6 +96,12 @@ class Create_Deal(models.Model):
         "10": "10",
         "25": "25",
         "50": "50",
+        "1+1": "1+1",
+        "FREE ITEM": "FREE ITEM",
+        "PRE ORDER": "PRE ORDER",
+        "LATE NIGHT": "LATE NIGHT",
+        "QOUPON+": "QOUPON+"
+    
     } 
 
   
@@ -107,7 +113,7 @@ class Create_Deal(models.Model):
     
     qrimage = models.ImageField(upload_to='deals_qr/', null=True, blank=True)
     # discount_value = models.DecimalField(max_digits=10, decimal_places=2, help_text="Percentage or fixed amount")
-    discount_value = models.CharField(max_length=3, choices=discount_percentage)
+    discount_value = models.CharField(max_length=30, choices=discount_percentage)
 
     start_date = models.DateTimeField()
     end_date = models.DateTimeField()

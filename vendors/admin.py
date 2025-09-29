@@ -62,7 +62,7 @@ class WishDealAdmin(admin.ModelAdmin):
     ordering = ('-added_at',)
 admin.site.register(WishDeal, WishDealAdmin)
 
-
+'''
 class DealTimeSlotInline(admin.TabularInline):
     model = DealTimeSlot
     extra = 1  
@@ -71,9 +71,11 @@ class DealTimeSlotInline(admin.TabularInline):
     def get_queryset(self, request):
         queryset = super().get_queryset(request)
         return queryset.order_by('day') 
+    
+    
 
 class DealAdmin(admin.ModelAdmin):
-    list_display = ('id', 'title', 'discount_value', 'user', 'created_at')
+    list_display = ('id', 'title', 'discount_value_free','discount_value_paid', 'user', 'created_at')
     search_fields = ('title', 'user__email')
     list_filter = ('created_at',)
     ordering = ('-created_at',)
@@ -81,6 +83,52 @@ class DealAdmin(admin.ModelAdmin):
 
 admin.site.register(Create_Deal, DealAdmin)
 
+'''
+
+
+from django.contrib import admin
+from .models import DealTimeSlot, Create_Deal
+
+class DealTimeSlotInline(admin.TabularInline):
+    model = DealTimeSlot
+    extra = 1  
+    fields = ['day', 'is_active', 'start_time', 'end_time']
+
+    # Customizing the queryset to filter by 'day' or 'is_active'
+    def get_queryset(self, request):
+        queryset = super().get_queryset(request)
+
+        # Example: filter by active status
+        is_active = request.GET.get('is_active')  # Example of checking a GET parameter for 'is_active'
+        if is_active is not None:
+            queryset = queryset.filter(is_active=is_active)
+
+        # Example: filter by day, could also use a parameter in request if you need dynamic filtering
+        day_filter = request.GET.get('day')
+        if day_filter:
+            queryset = queryset.filter(day=day_filter)
+
+        return queryset.order_by('day')  # Optionally, sort by day
+
+    # Optional: Add a custom filter for 'day' or 'is_active'
+    def day_filter(self, request):
+        # Dynamically add filter options to the inline form (e.g., by day)
+        # You can use a drop-down filter for days or status, for example
+        return DealTimeSlot.objects.values_list('day', flat=True).distinct()
+        
+    # Optional: You could also implement filters for more fields if needed
+    def is_active_filter(self, request):
+        return DealTimeSlot.objects.values_list('is_active', flat=True).distinct()
+
+
+class DealAdmin(admin.ModelAdmin):
+    list_display = ('id', 'title', 'discount_value_free', 'user', 'created_at')
+    search_fields = ('title', 'user__email')
+    list_filter = ('created_at',)
+    ordering = ('-created_at',)
+    inlines = [DealTimeSlotInline]
+
+admin.site.register(Create_Deal, DealAdmin)
 
 @admin.register(DealTimeSlot)
 class DealTimeSlotAdmin(admin.ModelAdmin):

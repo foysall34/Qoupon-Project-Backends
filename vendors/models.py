@@ -104,6 +104,12 @@ class Create_Deal(models.Model):
     
     } 
 
+    deal_type = {
+        "Free": "Free",
+        "Paid": "Paid",
+        "Both": "Both"
+    }
+
   
     linked_menu_item = models.ForeignKey(Deal, on_delete=models.CASCADE, related_name='deals')
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='create', null= True)
@@ -113,7 +119,9 @@ class Create_Deal(models.Model):
     
     qrimage = models.ImageField(upload_to='deals_qr/', null=True, blank=True)
     # discount_value = models.DecimalField(max_digits=10, decimal_places=2, help_text="Percentage or fixed amount")
-    discount_value = models.CharField(max_length=30, choices=discount_percentage)
+    discount_value_free = models.CharField(max_length=30, choices=discount_percentage, blank=True, null=True)
+    discount_value_paid = models.CharField(max_length=30, choices=discount_percentage, blank=True, null=True)
+    deal_type = models.CharField(max_length=20, choices=deal_type, null= True)
 
     start_date = models.DateTimeField()
     end_date = models.DateTimeField()
@@ -142,6 +150,10 @@ class DealTimeSlot(models.Model):
 
     def __str__(self):
         return f"{self.deal.title} - {self.day} - Active: {self.is_active}"
+    
+
+    def filter_by_day(self, day):
+        return DealTimeSlot.objects.filter(deal = self.deal)
         
 
 

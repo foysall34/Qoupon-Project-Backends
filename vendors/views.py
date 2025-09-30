@@ -8,6 +8,7 @@ from rest_framework.filters import SearchFilter
 from rest_framework .permissions import IsAuthenticated
 from rest_framework.parsers import MultiPartParser, FormParser
 from django.shortcuts import get_object_or_404 
+from subscription.models import Subscription
 
 class AllBusinessProfilesListView(generics.ListAPIView):
     queryset = Business_profile.objects.all()
@@ -246,19 +247,41 @@ class ImageUploadView(APIView):
         
 
 class AllDealsView(APIView):
+    permission_classes = [IsAuthenticated]
     def get(self, request):
-        data = Create_Deal.objects.all()
-        serializer = Create_DealSerializer(data, many=True)
+        user = request.user
+        if hasattr(user, "subscription") and user.subscription.is_active:
+            deals = Create_Deal.objects.filter(is_active=True)
+        
+        elif hasattr(user, "business_profile"):
+            deals = Create_Deal.objects.filter(is_active=True, user=user)
+        
+        else:
+            deals = Create_Deal.objects.filter(is_active=True, deal_type__in=["Free", "Both"])
+
+        serializer = Create_DealSerializer(deals, many=True, context={"request": request})
         return Response(serializer.data)
     
+
+class AllVendorDealsView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request):
+
+        deals = Create_Deal.objects.filter(is_active=True)
+        serializer = Create_DealSerializer(deals, many=True, context={"request": request})
+        return Response(serializer.data)
+    
+
 class ALlDealsDetailsView(APIView):
     def get(self, request, id):
-        try:
-            deal = Create_Deal.objects.get(id=id)
-            serializer = Create_DealSerializer(deal)
-            return Response(serializer.data)
-        except Create_Deal.DoesNotExist:
-            return Response({"detail": "Not found."}, status=status.HTTP_404_NOT_FOUND)
+        user = request.user
+        if hasattr(user, "subscription") and user.subscription.is_active:
+            deals = Create_Deal.objects.get(is_active=True, id=id)
+        else:
+            deals = Create_Deal.objects.get(is_active=True, deal_type__in=["Free", "Both"], id=id)
+        serializer= Create_DealSerializer(deals, context={"request": request})
+        return Response(serializer.data)
     
 
 class DealByIDView(APIView):

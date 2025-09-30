@@ -56,6 +56,7 @@ class Profile(models.Model):
     country = models.CharField(max_length=100, blank=True)
     city = models.CharField(max_length=100, blank=True)
     address = models.TextField(blank=True)
+    mollie_customer_id = models.CharField(max_length=100, blank=True, null=True)
 
     def __str__(self):
          return f"{self.user.get_username()}'s Profile"

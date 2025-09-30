@@ -34,6 +34,7 @@ urlpatterns = [
     path('support/' ,  include('support.urls')),
     path('order/' ,  include('order.urls')),
     path('qrcode/' ,  include('QrCodeApp.urls')),
+    path('subscription/' ,  include('subscription.urls')),
 ]
 
 if settings.DEBUG:

@@ -101,6 +101,7 @@ class ProfileSerializer(serializers.ModelSerializer):
 
     # We create a new read-only field that will contain the generated URL.
     profile_picture_url = serializers.SerializerMethodField()  # This serializersMethod use extra field , you can't take input from frontend only show json response
+    subscription_status = serializers.SerializerMethodField()
 
     class Meta:
         model = Profile
@@ -114,7 +115,8 @@ class ProfileSerializer(serializers.ModelSerializer):
             'profile_picture_url',
             'country' ,
             'city',
-            'address'  # Used for display (read-only)
+            'address',  # Used for display (read-only)
+            'subscription_status'
         ]
         extra_kwargs = {
             'profile_picture': {'write_only': True}
@@ -128,4 +130,15 @@ class ProfileSerializer(serializers.ModelSerializer):
         if obj.profile_picture:
             return obj.profile_picture.url
         return None 
-        
+    def get_subscription_status(self, obj):
+        from subscription.models import Subscription
+        try:
+            subscription = Subscription.objects.filter(user=obj.user).last()
+            if subscription:
+                if subscription.is_active:
+                    return "Active"
+                else:
+                    return "Inactive"
+            return "Inactive"
+        except Subscription.DoesNotExist:
+            return "Inactive"

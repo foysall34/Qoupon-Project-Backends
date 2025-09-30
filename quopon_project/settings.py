@@ -51,7 +51,7 @@ INSTALLED_APPS = [
     'order',
     'drf_yasg',
     'QrCodeApp',
-      
+    'subscription',
     
 ]
 

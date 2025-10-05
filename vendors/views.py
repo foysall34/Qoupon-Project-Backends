@@ -326,15 +326,30 @@ class WishDealListCreateView(APIView):
 
     def post(self, request):
         """
-        POST: Add a new wish deal for the authenticated user
+        POST: Add a new wish deal for the authenticated user and increment the activation field in Create_Deal.
         """
         data = request.data
-        data['user'] = request.user.id 
+        data['user'] = request.user.id  # Automatically add the authenticated user's ID
         serializer = WishDealSerializer(data=data)
 
         if serializer.is_valid():
-            serializer.save()
+            # Save the new wish deal
+            wish_deal = serializer.save()
+
+            try:
+                create_deal = wish_deal.deal  
+                
+                create_deal.activation += 1  
+                create_deal.save() 
+
+                print(f"Updated Create_Deal activation: {create_deal.activation}")
+
+            except Create_Deal.DoesNotExist:
+                # Handle the case where the associated Create_Deal is not found
+                return Response({"detail": "Associated deal not found."}, status=status.HTTP_404_NOT_FOUND)
+
             return Response(serializer.data, status=status.HTTP_201_CREATED)
+        
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def delete(self, request, pk=None):

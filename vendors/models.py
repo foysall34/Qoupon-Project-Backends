@@ -136,6 +136,8 @@ class Create_Deal(models.Model):
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     view_count = models.PositiveIntegerField(default=0)
+    activation = models.PositiveIntegerField(default=0)
+    redemption = models.PositiveIntegerField(default=0)
 
     def __str__(self):
         return self.title

@@ -214,6 +214,9 @@ class Create_DealSerializer(serializers.ModelSerializer):
             'delivery_costs' ,
             'is_active',
             'qrimage',
+            'view_count',
+            'activation',
+            'redemption',
         ]
         extra_kwargs = {
             'image': {'write_only': True, 'required': False}

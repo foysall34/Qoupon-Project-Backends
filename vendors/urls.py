@@ -31,4 +31,9 @@ urlpatterns = [
     path('<int:deal_id>/send-notification/', views.SendDealNotification.as_view(), name='vendor-create-deals-list'),
     path('all-vendor-deals/', views.AllVendorDealsView.as_view(), name='all-vendor-deals-list'),
 
+    path("vendors/<int:vendor_id>/follow/", views.FollowVendorAPIView.as_view(), name="follow-vendor"),
+    path("vendors/<int:vendor_id>/unfollow/", views.UnfollowVendorAPIView.as_view(), name="unfollow-vendor"),
+    path("customers/followed-vendors/", views.FollowedVendorsListAPIView.as_view(), name="followed-vendors"),
+    path("vendors/followers/", views.VendorFollowersListAPIView.as_view(), name="vendor-followers"),
+
 ]       

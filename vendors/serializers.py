@@ -64,8 +64,29 @@ class Business_profile_Serializer(serializers.ModelSerializer):
             return obj.logo.url
         return None
 
+from django.contrib.auth import get_user_model
+from rest_framework import serializers
+
+class BusinessProfileDetailsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Business_profile
+        fields = [
+            'name',
+            'logo',
+            'phone_number',
+            'kvk_number',
+            'address'
+        ]
 
 
+User = get_user_model()
+
+class FollowerSerializer(serializers.ModelSerializer):
+    business_profile = BusinessProfileDetailsSerializer(read_only=True)
+
+    class Meta:
+        model = User
+        fields = ["id", "email", "business_profile"]
 
 
 

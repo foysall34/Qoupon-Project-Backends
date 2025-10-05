@@ -3,6 +3,7 @@ from django.conf import settings
 from cloudinary.models import CloudinaryField
 from django.db.models.signals import post_save
 from django.dispatch import receiver
+from vendors.models import Business_profile
 
 
 class FoodCategory(models.Model):
@@ -47,8 +48,7 @@ class Profile(models.Model):
         ('Spanish', 'Spanish'),
     )
 
-    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='profile')    
-    # CloudinaryField 
+    user = models.OneToOneField(settings.AUTH_USER_MODEL,on_delete=models.CASCADE,related_name='profile')
     profile_picture = CloudinaryField('image', blank=True, null=True)
     full_name = models.CharField(max_length=255, blank=True)
     phone_number = models.CharField(max_length=20, blank=True)
@@ -59,7 +59,7 @@ class Profile(models.Model):
     mollie_customer_id = models.CharField(max_length=100, blank=True, null=True)
 
     def __str__(self):
-         return f"{self.user.get_username()}'s Profile"
+        return f"{self.user.get_username()}'s Profile"
 
 
 @receiver(post_save, sender=settings.AUTH_USER_MODEL)

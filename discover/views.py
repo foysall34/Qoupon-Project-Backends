@@ -333,7 +333,23 @@ class ReviewMenuItemViewSet(ModelViewSet):
     def get_queryset(self):
         return ReviewMenuItem.objects.filter(user=self.request.user)
 
+class MenuCategoryView(APIView):
+    permission_classes = [AllowAny]
 
+    def get(self, request, format=None):
+        categories = MenuCategory.objects.all()
+        serializer = MenuCategorySerializer(categories, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class MenuItemsView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request, pk):
+        menu_items = MenuItem.objects.filter(category_id=pk).prefetch_related('option_title__options')
+        serializer = MenuItemSerializer(menu_items, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    
     
 
 class MyReviewListView(ListAPIView):

@@ -152,7 +152,7 @@ def place_detail(request, pk):
 
 # For profile page api 
 
-@api_view(['GET', 'POST', 'PUT'])
+@api_view(['GET', 'POST', 'PUT', 'PATCH'])
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsAuthenticated])
 def user_profile_view(request):
@@ -170,6 +170,18 @@ def user_profile_view(request):
             return Response({
                 "success": True,
                 "message": f"Profile successfully updated .",
+                "data": serializer.data
+            })
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    elif request.method == 'PATCH':
+        # Handle the PATCH method (partial update)
+        serializer = ProfileSerializer(profile, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response({
+                "success": True,
+                "message": "Profile successfully updated.",
                 "data": serializer.data
             })
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

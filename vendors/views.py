@@ -1,7 +1,10 @@
 
 from rest_framework import generics, permissions
+
+from food.models import Profile
+from food.serializers import ProfileSerializer
 from .models import Business_profile , Business_profile_Category, WishDeal
-from .serializers import Business_profile_Serializer,Categories_Serializer ,BusinessProfileCategorySerializer,ImageSerializer, WishDealSerializer
+from .serializers import Business_profile_Serializer,Categories_Serializer ,BusinessProfileCategorySerializer,ImageSerializer, WishDealSerializer, FollowerSerializer
 from rest_framework.response import Response
 from rest_framework import generics, permissions, status
 from rest_framework.filters import SearchFilter
@@ -9,6 +12,7 @@ from rest_framework .permissions import IsAuthenticated
 from rest_framework.parsers import MultiPartParser, FormParser
 from django.shortcuts import get_object_or_404 
 from subscription.models import Subscription
+
 
 class AllBusinessProfilesListView(generics.ListAPIView):
     queryset = Business_profile.objects.all()
@@ -408,3 +412,72 @@ class SendDealNotification(APIView):
             status=status.HTTP_200_OK
         )
         
+
+
+# 1️⃣ Follow a vendor
+class FollowVendorAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, vendor_id):
+        try:
+            vendor = Business_profile.objects.get(id=vendor_id)
+        except Business_profile.DoesNotExist:
+            return Response({"error": "Vendor not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        vendor.followers.add(request.user)
+        return Response({"message": "Successfully followed vendor"}, status=status.HTTP_200_OK)
+
+
+# 2️⃣ Unfollow a vendor
+class UnfollowVendorAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, vendor_id):
+        try:
+            vendor = Business_profile.objects.get(id=vendor_id)
+        except Business_profile.DoesNotExist:
+            return Response({"error": "Vendor not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        vendor.followers.remove(request.user)
+        return Response({"message": "Successfully unfollowed vendor"}, status=status.HTTP_200_OK)
+
+
+# 3️⃣ Get List of Followed Vendors of a Customer
+class FollowedVendorsListAPIView(generics.ListAPIView):
+    serializer_class = Business_profile_Serializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return self.request.user.followed_vendors.all()
+
+
+# 4️⃣ Get List of Customers that Follow Me (as Vendor)
+from rest_framework import generics, permissions
+from django.db.models import Prefetch
+
+class VendorFollowersListAPIView(generics.ListAPIView):
+    # Use your existing Profile serializer so you return Profile fields
+    serializer_class = ProfileSerializer
+    permission_classes = [permissions.IsAuthenticated]  # needs the vendor user
+
+    def get_queryset(self):
+        # Locate the vendor's business profile(s)
+        business = (
+            Business_profile.objects
+            .filter(owner=self.request.user)
+            .first()
+        )
+
+        if not business:
+            return Profile.objects.none()
+
+        # Users who follow this vendor
+        follower_users_qs = business.followers.all().only('id')  # cheaper
+
+        # Return Profile rows for those users
+        # (adjust select_related/prefetch to your Profile model fields)
+        return (
+            Profile.objects
+            .filter(user__in=follower_users_qs)
+            .select_related('user')  # if Profile has OneToOne to User
+        )

@@ -29,6 +29,9 @@ urlpatterns = [
     path('review-menu-item/', views.ReviewMenuItemViewSet.as_view({'post': 'create'}), name='review-menu-item-create'),
 
     path('my-reviews/', views.MyReviewListView.as_view(), name='my-review-list'),
+    path('menu/categories/', views.MenuCategoryView.as_view(), name='menu-category-list'), 
+    path('menu/items/<int:pk>/', views.MenuItemsView.as_view(), name='menu-item-list'),
+
    
     
 ]

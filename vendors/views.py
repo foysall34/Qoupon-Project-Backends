@@ -208,6 +208,20 @@ class CreateDealViewSet(viewsets.ModelViewSet):
         filename = f"deal_{deal.id}_qr.png"
         deal.qrimage.save(filename, ContentFile(buffer.read()), save=True)
 
+    def retrieve(self, request, *args, **kwargs):
+        """
+        Override retrieve to increment the view count each time a deal is viewed.
+        """
+        deal = self.get_object()  # Get the deal by its pk
+
+        # Increment view count
+        deal.view_count += 1
+        deal.save()
+
+        # Proceed with the default retrieve action
+        serializer = self.get_serializer(deal)
+        return Response(serializer.data)
+
 
 # for categories views.py (breakfast , lunch , dinner )
 class categoryItemListView(generics.ListAPIView):

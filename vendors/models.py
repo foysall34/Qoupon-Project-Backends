@@ -135,6 +135,7 @@ class Create_Deal(models.Model):
     max_coupons_per_customer = models.PositiveIntegerField(default=1, verbose_name="Max Coupons Per Customer")
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
+    view_count = models.PositiveIntegerField(default=0)
 
     def __str__(self):
         return self.title

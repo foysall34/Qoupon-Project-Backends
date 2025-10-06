@@ -1,7 +1,7 @@
 
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from .views import  CreateStoreViewPatch,AllBusinessProfilesListView,ImageUploadView,BusinessProfileCategoryViewSet,categoryItemListView,DealViewSet, CategoryViewSet, CreateStoreView ,CreateDealViewSet
+from .views import  CreateStoreViewPatch,AllBusinessProfilesListView,ImageUploadView,BusinessProfileCategoryViewSet,categoryItemListView, DealViewSet, CategoryViewSet, CreateStoreView ,CreateDealViewSet
 from . import views
 
 

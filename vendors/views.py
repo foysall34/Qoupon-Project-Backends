@@ -94,18 +94,40 @@ class CategoryViewSet(viewsets.ModelViewSet):
 
 
 class DealViewSet(viewsets.ModelViewSet):
- 
-    queryset = Deal.objects.all() 
+    queryset = Deal.objects.all()
     serializer_class = DealSerializer
     
     def get_queryset(self):
         """
+        Optionally restricts the returned deals to a specific user if `user_id` is provided in query params.
         """
         queryset = super().get_queryset() 
         user_id = self.request.query_params.get('user_id', None)
         if user_id is not None:
             queryset = queryset.filter(user__id=user_id)
         return queryset
+
+    def partial_update(self, request, *args, **kwargs):
+        """
+        Handle partial update (PATCH request) for a deal.
+        Allows updating specific fields without requiring all fields.
+        """
+        # Get the instance to be updated
+        instance = self.get_object()
+
+        # Here, we assume that you're sending the fields to be updated in the request body.
+        serializer = self.get_serializer(instance, data=request.data, partial=True)
+        
+        # Check if the serialized data is valid
+        if serializer.is_valid():
+            # Save the updated instance
+            serializer.save()
+
+            # Return the updated instance data in the response
+            return Response(serializer.data)
+        else:
+            # If validation fails, return the errors in the response
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 

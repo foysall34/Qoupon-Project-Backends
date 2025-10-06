@@ -8,6 +8,7 @@ from decimal import Decimal
 from django.db import models
 from django.conf import settings
 from decimal import Decimal
+from vendors.models import Deal
 
 import random
 import string
@@ -172,14 +173,14 @@ class ReviewMenuItem(models.Model):
         (4, '4'),
         (5, '5'),
     ]
-    menu_item = models.ForeignKey(MenuItem, related_name='reviews', on_delete=models.CASCADE)
+    menu_item = models.ForeignKey(Deal, related_name='reviews', on_delete=models.CASCADE)
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     rating = models.PositiveIntegerField(choices=RATING_CHOICES)
     comment = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"Review by {self.user} for {self.menu_item.name}"   
+        return f"Review by {self.user} for {self.menu_item}"   
 
 
 class ReviewReply(models.Model):

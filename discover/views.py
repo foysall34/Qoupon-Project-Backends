@@ -364,7 +364,53 @@ class ReviewReplyView(APIView):
             "comment": reply.comment,
             "created_at": reply.created_at
         }, status=status.HTTP_201_CREATED)
+    
 
+class AllReviewView(APIView):
+    permission_classes = [AllowAny]
+    
+    def get(self, request):
+        reviews = ReviewMenuItem.objects.all().order_by('-created_at')
+        serialized_reviews = [
+            {
+                "id": review.id,
+                "menu_item": {
+                    "id": review.menu_item.id,
+                    "title": review.menu_item.title
+                },
+                "user": getattr(review.user, 'username', None) or getattr(review.user, 'email', 'Anonymous User'),
+                "rating": review.rating,
+                "comment": review.comment,
+                "created_at": review.created_at
+            }
+            for review in reviews
+        ]
+        return Response(serialized_reviews, status=status.HTTP_200_OK)
+
+
+
+class ReviewReplyView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, review_id, format=None):
+        try:
+            review = ReviewMenuItem.objects.get(id=review_id)
+        except ReviewMenuItem.DoesNotExist:
+            return Response({"error": "Review not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        replies = ReviewReply.objects.filter(review=review).order_by('-created_at')
+        serialized_replies = [
+            {
+                "id": reply.id,
+                "review_id": reply.review.id,
+                "user": getattr(reply.user, 'username', None) or getattr(reply.user, 'email', 'Anonymous User'),
+                "comment": reply.comment,
+                "created_at": reply.created_at
+            }
+            for reply in replies
+        ]
+
+        return Response(serialized_replies, status=status.HTTP_200_OK)
     
 
 class MenuCategoryView(APIView):

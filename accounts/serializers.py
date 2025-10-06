@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import User
+from .models import User, SearchHistory
 from django.utils import timezone
 from datetime import timedelta
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
@@ -39,3 +39,11 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         data['user_type'] = self.user.user_type
   
         return data
+    
+
+class SearchHistorySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SearchHistory
+        fields = ['id', 'user', 'query', 'searched_at']
+        read_only_fields = ['id', 'user', 'searched_at']
+        

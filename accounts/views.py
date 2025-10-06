@@ -3,13 +3,14 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.views import TokenObtainPairView
 from .serializers import (
+    SearchHistorySerializer,
     UserRegistrationSerializer, 
     VerifyOTPSerializer,
     ForgotPasswordSerializer,
     SetNewPasswordSerializer,
     CustomTokenObtainPairSerializer
 )
-from .models import User
+from .models import SearchHistory, User
 from .utils import generate_otp, send_otp_via_email
 from django.utils import timezone
 from datetime import timedelta
@@ -132,3 +133,24 @@ class SetNewPasswordView(APIView):
             )
             
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+
+class SearchHistoryView(APIView):
+
+    def post(self, request):
+        user = request.user
+        query = request.data.get('query', '').strip()
+        
+        if not query:
+            return Response({'error': 'Query cannot be empty.'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Create a new search history entry
+        SearchHistory.objects.create(user=user, query=query)
+        
+        return Response({'message': 'Search history recorded.'}, status=status.HTTP_201_CREATED)
+    
+    def get(self, request):
+        user = request.user
+        search_histories = user.search_histories.all().order_by('-searched_at')  # Assuming related_name is 'search_histories'
+        serializer = SearchHistorySerializer(search_histories, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)

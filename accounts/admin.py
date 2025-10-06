@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
-from .models import User
+from .models import User, SearchHistory
 
 class UserAdmin(BaseUserAdmin):
     
@@ -28,3 +28,9 @@ class UserAdmin(BaseUserAdmin):
     filter_horizontal = ('groups', 'user_permissions',)
 
 admin.site.register(User, UserAdmin)
+
+class SearchHistoryAdmin(admin.ModelAdmin):
+    list_display = ('id', 'user', 'query', 'searched_at')
+    list_filter = ('searched_at',)
+    search_fields = ('user__email', 'query')    
+admin.site.register(SearchHistory, SearchHistoryAdmin)

@@ -1,7 +1,7 @@
 
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from .views import  CreateStoreViewPatch,AllBusinessProfilesListView,ImageUploadView,BusinessProfileCategoryViewSet,categoryItemListView,DealViewSet, CategoryViewSet, ModifierGroupViewSet , CreateStoreView ,CreateDealViewSet
+from .views import  CreateStoreViewPatch,AllBusinessProfilesListView,ImageUploadView,BusinessProfileCategoryViewSet,categoryItemListView,DealViewSet, CategoryViewSet, CreateStoreView ,CreateDealViewSet
 from . import views
 
 
@@ -9,7 +9,6 @@ router = DefaultRouter()
 router.register(r'deals', DealViewSet , basename='deal')
 router.register(r'create-deals', CreateDealViewSet, basename='create-deal')
 router.register(r'categories', CategoryViewSet)
-router.register(r'modifier-groups', ModifierGroupViewSet)
 router.register(r'vendor-categories', BusinessProfileCategoryViewSet, basename='business-profile-category')
 
 

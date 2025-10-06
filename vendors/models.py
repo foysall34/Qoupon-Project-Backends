@@ -49,10 +49,19 @@ class Vendor_Category(models.Model):
 
     def __str__(self):
         return f" {self.choice_category}"
+    
+class Modifier(models.Model):
+    name = models.CharField(max_length=100)
+    price = models.DecimalField(max_digits=6, decimal_places=2, default=0.0)
+
+    def __str__(self):
+        return f"{self.name} (+{self.price})"
 
 class ModifierGroup(models.Model):
     
     name = models.CharField(max_length=100, unique=True)
+    modifiers = models.ManyToManyField('Modifier', related_name='modifier_groups')
+    is_required = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -71,7 +80,17 @@ class Deal(models.Model):
 
     image = CloudinaryField('logo', default = 'logo.jpg')
     category = models.ForeignKey(Vendor_Category, related_name='deals', on_delete=models.SET_NULL, null=True)
-    modifier_groups = models.ManyToManyField(ModifierGroup, related_name='deals')
+    modifiers = models.JSONField(default=list, blank=True, 
+        help_text='''Format: [
+            {
+                "name": "Select Your Bread",
+                "is_required": true,
+                "options": [
+                    {"title": "Classic Bread", "Price": 2.50},
+                    {"title": "Brown Bread", "Price": null}
+                ]
+            }
+        ]''')
     
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

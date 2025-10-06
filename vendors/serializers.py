@@ -1,9 +1,17 @@
 
 from rest_framework import serializers
-from .models import Business_profile, Business_profile_Category, WishDeal
-from .models import Deal, Vendor_Category, ModifierGroup
-from django_filters.rest_framework import DjangoFilterBackend 
+from django_filters.rest_framework import DjangoFilterBackend
 from django.contrib.auth import get_user_model
+from .models import (
+    Business_profile, 
+    Business_profile_Category, 
+    WishDeal,
+    Deal, 
+    Vendor_Category, 
+    Create_Deal, 
+    DeliveryCost,
+    Image
+)
 
 User = get_user_model()
 
@@ -96,81 +104,87 @@ class CategorySerializer(serializers.ModelSerializer):
         fields = ['id', 'category_title']
         ref_name = "VendorCategory"
 
-class ModifierGroupSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = ModifierGroup
-        fields = ['id', 'name']
-
 class DealSerializer(serializers.ModelSerializer):
     """
     Serializer for the Deal model.
     """
-    # GET রেসপন্সের জন্য user অবজেক্টের বিস্তারিত তথ্য
     email = serializers.ReadOnlyField(source='user.email')
     category = CategorySerializer(read_only=True)
-    modifier_groups = ModifierGroupSerializer(many=True, read_only=True)
-
-    # POST/PUT রিকোয়েস্টের জন্য user id ইনপুট নেবে।
-    # 'user' মডেলের user ফিল্ডের সাথে এটি ম্যাপ করা।
-    user = serializers.PrimaryKeyRelatedField(
-        queryset=User.objects.all(),
-        required=True
-    )
-    
-    # রেসপন্সে user_id দেখানোর জন্য
     user_id = serializers.ReadOnlyField(source='user.id')
-
-    # POST/PUT রিকোয়েস্টের জন্য category_id গ্রহণ করবে
     category_id = serializers.PrimaryKeyRelatedField(
         queryset=Vendor_Category.objects.all(),
         source='category',
         write_only=True,
         required=True
     )
-
-    # POST/PUT রিকোয়েস্টের জন্য modifier_group_ids গ্রহণ করবে
-    modifier_group_ids = serializers.PrimaryKeyRelatedField(
-        many=True,
-        queryset=ModifierGroup.objects.all(),
-        source='modifier_groups',
-        write_only=True,
-        required=False
-    )
-    
     logo_image = serializers.SerializerMethodField()
+
+    def validate_modifiers(self, value):
+        """
+        Validate the modifiers JSON structure
+        """
+        if not isinstance(value, list):
+            raise serializers.ValidationError("Modifiers must be a list")
+        
+        for modifier in value:
+            if not isinstance(modifier, dict):
+                raise serializers.ValidationError("Each modifier must be an object")
+            
+            required_fields = {'name', 'is_required', 'options'}
+            if not all(field in modifier for field in required_fields):
+                raise serializers.ValidationError(
+                    f"Each modifier must contain {required_fields}"
+                )
+            
+            if not isinstance(modifier['options'], list):
+                raise serializers.ValidationError("Options must be a list")
+            
+            for option in modifier['options']:
+                if not isinstance(option, dict):
+                    raise serializers.ValidationError("Each option must be an object")
+                
+                if 'title' not in option:
+                    raise serializers.ValidationError("Each option must have a title")
+                
+                if 'Price' in option and option['Price'] is not None:
+                    try:
+                        float(option['Price'])
+                    except (TypeError, ValueError):
+                        raise serializers.ValidationError("Price must be a number or null")
+        
+        return value
+
+    def create(self, validated_data):
+        """
+        Create a new Deal instance and set the user from the request
+        """
+        validated_data['user'] = self.context['request'].user
+        return super().create(validated_data)
 
     class Meta:
         model = Deal
         fields = [
             'id',
-            'user',                 # POST রিকোয়েস্টের জন্য আইডি নেবে
-            'user_id',              # GET রেসপন্সের জন্য আইডি দেখাবে
+            'user_id',
             'email',
             'title',
             'description',
             'price',
             'image',
             'logo_image',
-            'category',             # GET-এর জন্য
-            'modifier_groups',      # GET-এর জন্য
-            'category_id',          # POST/PUT-এর জন্য
-            'modifier_group_ids',   # POST/PUT-এর জন্য
+            'category',
+            'category_id',
+            'modifiers',
             'created_at'
         ]
-        
-        # 'user' ফিল্ডটি শুধু লেখার জন্য, তাই এটিকে read_only_fields থেকে বাদ দিতে হবে
-        read_only_fields = ['id', 'user_id', 'email', 'created_at', 'category', 'modifier_groups']
-        
+        read_only_fields = ['id', 'user_id', 'email', 'created_at', 'category']
         extra_kwargs = {
             'image': {'required': True, 'allow_null': False},
             'title': {'required': True},
-            'price': {'required': True},
-            # 'user' ফিল্ডটি শুধুমাত্র আইডি গ্রহণ করবে, পুরো অবজেক্ট নয়
-            'user': {'write_only': True}
+            'price': {'required': True}
         }
 
     def get_logo_image(self, obj):
-        # আপনার লজিক অনুযায়ী এখানে লোগো ইমেজের URL রিটার্ন করুন
         if obj.image:
             return obj.image.url
         return None

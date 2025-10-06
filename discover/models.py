@@ -182,6 +182,15 @@ class ReviewMenuItem(models.Model):
         return f"Review by {self.user} for {self.menu_item.name}"   
 
 
+class ReviewReply(models.Model):
+    review = models.ForeignKey(ReviewMenuItem, related_name='replies', on_delete=models.CASCADE)
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    comment = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Reply by {self.user} to review {self.review.id}"
+
 
 class OptionGroup(models.Model):
     item = models.ForeignKey(MenuItem, related_name='option_title', on_delete=models.CASCADE)

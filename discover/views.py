@@ -1,6 +1,6 @@
 from rest_framework.generics import ListAPIView
 from django.http import Http404
-from .models import Restaurant
+from .models import Restaurant, ReviewReply
 from .serializers import RestaurantSerializer, OfferSerializer  , OrderSerializer 
 from rest_framework.permissions import AllowAny 
 from django_filters import rest_framework as filters
@@ -332,6 +332,40 @@ class ReviewMenuItemViewSet(ModelViewSet):
 
     def get_queryset(self):
         return ReviewMenuItem.objects.filter(user=self.request.user)
+    
+
+class ReviewReplyView(APIView):
+    
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, review_id, format=None):
+        try:
+            review = ReviewMenuItem.objects.get(id=review_id)
+        except ReviewMenuItem.DoesNotExist:
+            return Response({"error": "Review not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        comment = request.data.get('comment')
+        if not comment:
+            return Response({"error": "Comment is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        reply = ReviewReply.objects.create(
+            review=review,
+            user=request.user,
+            comment=comment
+        )
+
+        # Check if your User model has `username`, otherwise use `email` or another field
+        user_identifier = getattr(reply.user, 'username', None) or getattr(reply.user, 'email', 'Anonymous User')
+
+        return Response({
+            "id": reply.id,
+            "review_id": review.id,
+            "user": user_identifier,
+            "comment": reply.comment,
+            "created_at": reply.created_at
+        }, status=status.HTTP_201_CREATED)
+
+    
 
 class MenuCategoryView(APIView):
     permission_classes = [AllowAny]

@@ -12,17 +12,39 @@ class QRCodeSerializer(serializers.ModelSerializer):
 
 class OrderItemSerializer(serializers.ModelSerializer):
     item_image = serializers.SerializerMethodField()
+    modifiers = serializers.SerializerMethodField()
  
     def get_item_image(self, obj):
         if hasattr(obj.deal, 'image'):
             return obj.deal.image.url if obj.deal.image else None
         return None
+
+    def get_modifiers(self, obj):
+        """Return formatted modifier data from the JSON field"""
+        if not obj.selected_modifiers:
+            return []
+        
+        # Return the modifiers as they are stored
+        # The format is already correct:
+        # [
+        #     {
+        #         "group_name": "Toast",
+        #         "selected_options": ["Baked"]
+        #     }
+        # ]
+        return obj.selected_modifiers
  
     class Meta:
         model = OrderItem
-        fields = ['id', 'deal', 'quantity', 'unit_price', 'total_price',
-                 'item_name', 'item_description', 'item_image']
-        read_only_fields = ['unit_price', 'total_price', 'item_name', 'item_description', 'item_image']
+        fields = [
+            'id', 'deal', 'quantity', 'unit_price', 'total_price',
+            'item_name', 'item_description', 'item_image', 'modifiers',
+            'modifiers_price'
+        ]
+        read_only_fields = [
+            'unit_price', 'total_price', 'item_name', 'item_description',
+            'item_image', 'modifiers', 'modifiers_price'
+        ]
 
 class AppliedDealSerializer(serializers.ModelSerializer):
     class Meta:
@@ -100,12 +122,19 @@ class OrderSerializer(serializers.ModelSerializer):
 
         # Create OrderItems from CartItems
         for cart_item in cart.items.all():
-            OrderItem.objects.create(
+            # Create OrderItem with cart_item reference for modifier handling
+            order_item = OrderItem(
                 order=order,
-                menu_item=cart_item.menu_item,
+                deal=cart_item.deal,
                 quantity=cart_item.quantity,
-                special_instructions=''  # Can be added in the future if needed
+                cart_item=cart_item  # Temporary reference for save method
             )
+            
+            # Save will handle copying modifiers and calculating prices
+            order_item.save()
+            
+            # Remove temporary reference
+            delattr(order_item, 'cart_item')
 
         # Create initial tracking entry
         OrderTracking.objects.create(

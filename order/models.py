@@ -44,12 +44,50 @@ class CartItem(models.Model):
     cart = models.ForeignKey(Cart, on_delete=models.CASCADE, related_name='cart_items')
     deal = models.ForeignKey(Deal, on_delete=models.CASCADE, related_name='order_cart_items')
     quantity = models.PositiveIntegerField(default=1)
+    selected_modifiers = models.JSONField(default=list, blank=True,
+        help_text='''Format: [
+            {
+                "group_name": "Select Your Bread",
+                "selected_options": ["Classic Bread"]
+            }
+        ]''')
     added_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
  
     @property
+    def modifiers_price(self):
+        total_modifier_price = Decimal('0.00')
+        # Get the modifiers configuration from the deal
+        modifier_groups = self.deal.modifiers
+        # Get the user's selections
+        selections = {item['group_name']: item['selected_options'] for item in self.selected_modifiers}
+        
+        # Calculate price for each selected modifier
+        for group in modifier_groups:
+            group_name = group['name']
+            if group_name in selections:
+                selected_options = selections[group_name]
+                for option in group['options']:
+                    if option['title'] in selected_options and option.get('Price') is not None:
+                        total_modifier_price += Decimal(str(option['Price']))
+        
+        return total_modifier_price
+
+    @property
     def unit_price(self):
-        return self.deal.price
+        # Base price of the deal plus all modifier prices
+        return self.deal.price + self.modifiers_price
+
+    def validate_modifiers(self):
+        """Validate that required modifier groups have selections"""
+        selections = {item['group_name']: item['selected_options'] for item in self.selected_modifiers}
+        
+        for group in self.deal.modifiers:
+            if group['is_required'] and (
+                group['name'] not in selections or 
+                not selections[group['name']]
+            ):
+                raise ValueError(f"Required modifier group '{group['name']}' must have a selection")
  
     @property
     def item_total(self):
@@ -225,12 +263,49 @@ class OrderItem(models.Model):
     item_description = models.TextField(blank=True)
     item_image = models.ImageField(upload_to='order_items/', blank=True)
     note = models.TextField(blank=True)
+    
+    # Store selected modifiers and ingredients
+    selected_modifiers = models.JSONField(default=dict, blank=True,
+        help_text="Format: {'modifier_group_id': {'name': 'group_name', 'required': bool, 'selections': [{'id': id, 'name': 'name', 'price': price}]}}")
+    modifiers_price = models.DecimalField(max_digits=10, decimal_places=2, default=0)
 
     def save(self, *args, **kwargs):
         if not self.pk and self.deal:  # New order item
             self.item_name = self.deal.title
             self.item_description = self.deal.description
-            self.unit_price = self.deal.price
+            
+            # Base price is deal price
+            base_price = self.deal.price
+            
+            # Store current state of selected modifiers if not already stored
+            if not self.selected_modifiers and hasattr(self, 'cart_item'):
+                modifier_data = {}
+                for group in self.cart_item.selected_modifier_groups.all():
+                    selections = self.cart_item.selected_modifiers.filter(modifier_groups=group)
+                    if selections.exists():
+                        modifier_data[str(group.id)] = {
+                            'name': group.name,
+                            'required': group.is_required,
+                            'selections': [
+                                {
+                                    'id': mod.id,
+                                    'name': mod.name,
+                                    'price': str(mod.price)
+                                }
+                                for mod in selections
+                            ]
+                        }
+                self.selected_modifiers = modifier_data
+                
+                # Calculate modifiers price
+                self.modifiers_price = sum(
+                    Decimal(mod['price'])
+                    for group in self.selected_modifiers.values()
+                    for mod in group['selections']
+                )
+            
+            # Calculate final prices
+            self.unit_price = base_price + self.modifiers_price
             self.total_price = self.unit_price * self.quantity
         super().save(*args, **kwargs)
  

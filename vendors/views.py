@@ -1,5 +1,6 @@
 
 from rest_framework import generics, permissions
+from django.db import models
 
 from food.models import Profile
 from food.serializers import ProfileSerializer
@@ -80,8 +81,8 @@ class CreateStoreViewPatch(generics.RetrieveUpdateAPIView):
         return Response(custom_response_data, status=status.HTTP_200_OK)
 
 from rest_framework import viewsets, parsers
-from .models import Deal, Vendor_Category, ModifierGroup
-from .serializers import DealSerializer, CategorySerializer, ModifierGroupSerializer
+from .models import Deal, Vendor_Category
+from .serializers import DealSerializer, CategorySerializer
 
 class CategoryViewSet(viewsets.ModelViewSet):
     """
@@ -91,13 +92,6 @@ class CategoryViewSet(viewsets.ModelViewSet):
     queryset = Vendor_Category.objects.all()
     serializer_class = CategorySerializer
 
-class ModifierGroupViewSet(viewsets.ModelViewSet):
-    """
-    API endpoint that allows modifier groups to be viewed or edited.
-    Provides data for the 'Choose Modifier Groups' dropdown.
-    """
-    queryset = ModifierGroup.objects.all()
-    serializer_class = ModifierGroupSerializer
 
 class DealViewSet(viewsets.ModelViewSet):
  
@@ -266,17 +260,28 @@ class ImageUploadView(APIView):
 
 class AllDealsView(APIView):
     permission_classes = [IsAuthenticated]
+
     def get(self, request):
         user = request.user
-        if hasattr(user, "subscription") and user.subscription.is_active:
-            deals = Create_Deal.objects.filter(is_active=True)
         
-        elif hasattr(user, "business_profile"):
-            deals = Create_Deal.objects.filter(is_active=True, user=user)
-        
-        else:
-            deals = Create_Deal.objects.filter(is_active=True, deal_type__in=["Free", "Both"])
+        # Get the active subscription
+        subscription = Subscription.objects.filter(user=user, is_active=True).first()
 
+        # If there's an active subscription, get all deals
+        if subscription:
+            deals = Create_Deal.objects.all()
+            print("User has an active subscription.")
+        else:
+            # If no active subscription, filter for "Free" or "Both" deals
+            deals = Create_Deal.objects.filter(is_active=True, deal_type__in=["Free", "Both"])
+            print("User does not have an active subscription.")
+
+        # Check if the user has a business profile and adjust the filtering accordingly
+        if hasattr(user, "business_profile"):
+            deals = Create_Deal.objects.filter(is_active=True, user=user)
+            print("User is a vendor with a business profile. Showing only their deals.")
+
+        # Serialize the filtered deals
         serializer = Create_DealSerializer(deals, many=True, context={"request": request})
         return Response(serializer.data)
     
@@ -285,8 +290,12 @@ class AllVendorDealsView(APIView):
     permission_classes = [permissions.AllowAny]
 
     def get(self, request):
-
+        # Get all active deals
         deals = Create_Deal.objects.filter(is_active=True)
+        
+        # For better performance, use update to increment all view counts at once
+        Create_Deal.objects.filter(is_active=True).update(view_count=models.F('view_count') + 1)
+        
         serializer = Create_DealSerializer(deals, many=True, context={"request": request})
         return Response(serializer.data)
     

@@ -9,7 +9,7 @@ from decimal import Decimal
 import logging
 from mollie.api.client import Client
 from mollie.api.error import UnprocessableEntityError, Error as MollieApiError
- 
+
 logger = logging.getLogger(__name__)
 from .models import (
     Cart, CartItem, CartDeal, Order, OrderItem,
@@ -23,6 +23,7 @@ from vendors.models import Deal, Create_Deal, Business_profile
 from rest_framework.exceptions import PermissionDenied
 from notifications.utils import FirebaseNotification
 import json
+from subscription.models import Subscription
  
 # Cart Views
 @api_view(['GET'])
@@ -30,10 +31,33 @@ import json
 def get_cart(request):
     """Get user's cart with items and applied deal"""
     cart, _ = Cart.objects.get_or_create(user=request.user)
+    
+    # Get all required modifiers for items in cart that are missing selections
+    missing_required_modifiers = []
+    for item in cart.cart_items.all():
+        deal_modifiers = item.deal.modifiers
+        required_groups = [group for group in deal_modifiers if group['is_required']]
+        selected_groups = {mod['group_name'] for mod in item.selected_modifiers}
+        
+        for group in required_groups:
+            if group['name'] not in selected_groups:
+                missing_required_modifiers.append({
+                    'cart_item_id': item.id,
+                    'deal_name': item.deal.title,
+                    'group_name': group['name'],
+                    'available_options': [opt['title'] for opt in group['options']]
+                })
+    
     # Calculate discount if a deal is applied
     applied_discount = Decimal('0.00')
     if hasattr(cart, 'applied_deal'):
         applied_discount = cart.applied_deal.calculated_discount
+        
+    if missing_required_modifiers:
+        return Response({
+            'error': 'Missing required selections',
+            'missing_modifiers': missing_required_modifiers
+        }, status=status.HTTP_400_BAD_REQUEST)
  
     data = {
         'id': cart.id,
@@ -52,6 +76,25 @@ def get_cart(request):
                 'image': item.deal.image.url if item.deal.image else None
             },
             'quantity': item.quantity,
+            'modifier_groups': [{
+                'name': modifier_group['name'],
+                'is_required': modifier_group['is_required'],
+                'selections': [
+                    {
+                        'title': option['title'],
+                        'price': str(option.get('Price', '0.00'))
+                    }
+                    for option in modifier_group['options']
+                    if any(selection == option['title'] 
+                          for selection in next((s['selected_options'] 
+                                               for s in item.selected_modifiers 
+                                               if s['group_name'] == modifier_group['name']), 
+                                              []))
+                ]
+            } for modifier_group in item.deal.modifiers],
+            'base_price': str(item.deal.price),
+            'modifiers_price': str(item.modifiers_price),
+            'unit_price': str(item.unit_price),
             'item_total': str(item.item_total)
         } for item in cart.cart_items.all()],
         'applied_deal': None
@@ -72,6 +115,7 @@ def add_to_cart(request):
     """Add deal to cart or update quantity if already exists"""
     deal_id = request.data.get('menu_item_id')
     quantity = int(request.data.get('quantity', 1))
+    selected_modifiers = request.data.get('selected_modifiers', [])
     
     if quantity < 1:
         return Response(
@@ -82,30 +126,159 @@ def add_to_cart(request):
     deal = get_object_or_404(Deal, id=deal_id)
     cart, _ = Cart.objects.get_or_create(user=request.user)
     
+    # Format the selected modifiers if they're not in the correct format
+    if selected_modifiers and not isinstance(selected_modifiers, list):
+        return Response(
+            {'error': 'selected_modifiers must be a list of selections'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    # Validate required modifiers
+    required_groups = [group['name'] for group in deal.modifiers if group['is_required']]
+    selected_groups = [mod['group_name'] for mod in selected_modifiers]
+    missing_required = set(required_groups) - set(selected_groups)
+    
+    if missing_required:
+        return Response(
+            {'error': f'Required modifier groups missing: {", ".join(missing_required)}'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    # Validate selections against available options
+    for selection in selected_modifiers:
+        group_name = selection['group_name']
+        selected_options = selection['selected_options']
+        
+        # Find the corresponding modifier group
+        modifier_group = next((group for group in deal.modifiers if group['name'] == group_name), None)
+        if not modifier_group:
+            return Response(
+                {'error': f'Invalid modifier group: {group_name}'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Validate selected options
+        available_options = [option['title'] for option in modifier_group['options']]
+        invalid_options = set(selected_options) - set(available_options)
+        if invalid_options:
+            return Response(
+                {'error': f'Invalid options for {group_name}: {", ".join(invalid_options)}'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+    # Create or update cart item
+    # Show required modifiers if none provided
+    if not selected_modifiers:
+        required_modifiers = [
+            {
+                'group_name': group['name'],
+                'is_required': group['is_required'],
+                'options': [{'title': opt['title'], 'price': opt.get('Price')} for opt in group['options']]
+            }
+            for group in deal.modifiers
+        ]
+        return Response({
+            'error': 'Please select required modifiers',
+            'required_modifiers': required_modifiers,
+            'example_payload': {
+                'menu_item_id': deal.id,
+                'quantity': quantity,
+                'selected_modifiers': [
+                    {
+                        'group_name': group['name'],
+                        'selected_options': ['Select an option from available options']
+                    }
+                    for group in deal.modifiers if group['is_required']
+                ]
+            }
+        }, status=status.HTTP_400_BAD_REQUEST)
+
     cart_item, created = CartItem.objects.get_or_create(
         cart=cart,
         deal=deal,
         defaults={
-            'quantity': quantity
+            'quantity': quantity,
+            'selected_modifiers': selected_modifiers
         }
     )
-    return Response({'message': 'Item added to cart','cart_total':str(cart.final_total)}, status=status.HTTP_201_CREATED)
+    
+    if not created:
+        cart_item.quantity = quantity
+        cart_item.selected_modifiers = selected_modifiers
+        cart_item.save()
+
+    return Response({
+        'message': 'Item added to cart',
+        'cart_total': str(cart.final_total),
+        'cart_item_id': cart_item.id
+    }, status=status.HTTP_201_CREATED)
  
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def update_cart_item(request, item_id):
-    """Update cart item quantity"""
+    """Update cart item quantity and modifiers"""
     cart_item = get_object_or_404(CartItem, id=item_id, cart__user=request.user)
     quantity = request.data.get('quantity')
+    selected_modifiers = request.data.get('selected_modifiers')
     
     if quantity is not None:
         if quantity > 0:
             cart_item.quantity = quantity
-            cart_item.save()
         else:
             cart_item.delete()
+            return Response({'message': 'Item removed from cart'})
     
-    return Response({'message': 'Cart updated'})
+    if selected_modifiers is not None:
+        # Validate the modifiers
+        deal_modifiers = cart_item.deal.modifiers
+        required_groups = [group['name'] for group in deal_modifiers if group['is_required']]
+        selected_groups = {mod['group_name'] for mod in selected_modifiers}
+        
+        # Check required groups
+        missing_required = set(required_groups) - selected_groups
+        if missing_required:
+            return Response({
+                'error': f'Required modifier groups missing: {", ".join(missing_required)}',
+                'required_groups': [
+                    {
+                        'name': group['name'],
+                        'options': [opt['title'] for opt in group['options']]
+                    }
+                    for group in deal_modifiers
+                    if group['name'] in missing_required
+                ]
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Validate selections
+        for selection in selected_modifiers:
+            group = next((g for g in deal_modifiers if g['name'] == selection['group_name']), None)
+            if not group:
+                return Response({
+                    'error': f'Invalid modifier group: {selection["group_name"]}'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            available_options = {opt['title'] for opt in group['options']}
+            invalid_options = set(selection['selected_options']) - available_options
+            if invalid_options:
+                return Response({
+                    'error': f'Invalid options for {selection["group_name"]}: {", ".join(invalid_options)}',
+                    'available_options': list(available_options)
+                }, status=status.HTTP_400_BAD_REQUEST)
+        
+        cart_item.selected_modifiers = selected_modifiers
+    
+    cart_item.save()
+    
+    return Response({
+        'message': 'Cart item updated',
+        'cart_item': {
+            'id': cart_item.id,
+            'quantity': cart_item.quantity,
+            'selected_modifiers': cart_item.selected_modifiers,
+            'unit_price': str(cart_item.unit_price),
+            'item_total': str(cart_item.item_total)
+        }
+    })
  
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
@@ -175,18 +348,59 @@ def calculate_checkout(request):
     
     if deal_id:
         deal = get_object_or_404(Create_Deal, id=deal_id)
-        # Calculate discount
-        if deal.discount_value <= 100:  # Percentage discount
-            discount = (cart.subtotal * Decimal(str(deal.discount_value))) / Decimal('100.00')
-        else:  # Fixed amount discount
-            discount = min(Decimal(str(deal.discount_value)), cart.subtotal)
+        subscription = Subscription.objects.filter(user=request.user).last()
+        is_subscribed = subscription and subscription.is_active
         
+        # Determine which discount value to use based on user's subscription status
+        discount_value = None
+        if deal.deal_type == 'Both':
+            # For 'Both' type, use paid if user is subscribed, otherwise use free
+            if is_subscribed:
+                discount_value = deal.discount_value_paid
+            else:
+                discount_value = deal.discount_value_free
+        elif deal.deal_type == 'Free':
+            discount_value = deal.discount_value_free
+        elif deal.deal_type == 'Paid':
+            # Only apply paid discount if user is subscribed
+            if is_subscribed:
+                discount_value = deal.discount_value_paid
+            else:
+                return Response(
+                    {
+                        'error': 'This deal is only available for subscribed users',
+                        'deal_type': 'Paid',
+                        'requires_subscription': True
+                    },
+                    status=status.HTTP_403_FORBIDDEN
+                )
+
+        # Calculate discount based on the type
+        discount = Decimal('0.00')
+        if discount_value in ['5', '10', '25', '50']:  # Percentage discounts
+            percentage = Decimal(discount_value)
+            discount = (cart.subtotal * percentage) / Decimal('100.00')
+        elif discount_value == '1+1':
+            # Buy one get one free - 50% off if buying even number of items
+            total_items = sum(item.quantity for item in cart.cart_items.all())
+            if total_items % 2 == 0:
+                discount = cart.subtotal * Decimal('0.50')
+            else:
+                discount = (cart.subtotal * Decimal('0.50')) - (cart.subtotal / total_items / Decimal('2.00'))
+        elif discount_value == 'FREE ITEM':
+            # Find the lowest priced item and make it free
+            min_price_item = min(cart.cart_items.all(), key=lambda x: x.unit_price)
+            discount = min_price_item.unit_price
+            
         checkout_data.update({
             'discount_amount': str(discount),
-            'final_total': str(cart.final_total - discount),
+            'final_total': str(cart.subtotal + cart.delivery_fee - discount),
             'applied_deal': {
                 'id': deal.id,
-                'title': deal.title
+                'title': deal.title,
+                'deal_type': deal.deal_type,
+                'discount_value': discount_value,
+                'is_subscribed': is_subscribed
             }
         })
     
@@ -223,17 +437,78 @@ def create_order(request):
             status=status.HTTP_400_BAD_REQUEST
         )
     
+    # Validate all cart items have required modifiers before proceeding
+    for cart_item in cart.cart_items.all():
+        print(f"Checking item {cart_item.id}: {cart_item.deal.title}")
+        print(f"Required modifiers in deal: {[g['name'] for g in cart_item.deal.modifiers if g['is_required']]}")
+        print(f"Current selections: {cart_item.selected_modifiers}")
+        
+        try:
+            cart_item.validate_modifiers()
+        except ValueError as e:
+            # Return more helpful error message with available options
+            missing_group_name = str(e).split("'")[1]  # Extract group name from error message
+            group_info = next((g for g in cart_item.deal.modifiers if g['name'] == missing_group_name), None)
+            
+            return Response({
+                'error': str(e),
+                'cart_item_id': cart_item.id,
+                'deal_name': cart_item.deal.title,
+                'missing_group': {
+                    'name': missing_group_name,
+                    'available_options': [opt['title'] for opt in group_info['options']] if group_info else []
+                }
+            }, status=status.HTTP_400_BAD_REQUEST)
+    
     # Calculate totals including deal if provided
-    subtotal = cart.subtotal
+    subtotal = cart.subtotal     
     delivery_fee = cart.delivery_fee
     discount_amount = Decimal('0.00')
+    subscription = Subscription.objects.filter(user=request.user).last()
+    is_subscribed = subscription and subscription.is_active
     
     if deal_id:
         deal = get_object_or_404(Create_Deal, id=deal_id)
-        if deal.discount_value <= 100:  # Percentage discount
-            discount_amount = (subtotal * Decimal(str(deal.discount_value))) / Decimal('100.00')
-        else:  # Fixed amount discount
-            discount_amount = min(Decimal(str(deal.discount_value)), subtotal)
+        
+        # Determine which discount value to use based on user's subscription status
+        discount_value = None
+        if deal.deal_type == 'Both':
+            # For 'Both' type, use paid if user is subscribed, otherwise use free
+            if is_subscribed:
+                discount_value = deal.discount_value_paid
+            else:
+                discount_value = deal.discount_value_free
+        elif deal.deal_type == 'Free':
+            discount_value = deal.discount_value_free
+        elif deal.deal_type == 'Paid':
+            # Only apply paid discount if user is subscribed
+            if is_subscribed:
+                discount_value = deal.discount_value_paid
+            else:
+                return Response(
+                    {'error': 'This deal is only available for subscribed users'},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+
+        # Calculate discount based on the type
+        if discount_value in ['5', '10', '25', '50']:  # Percentage discounts
+            percentage = Decimal(discount_value)
+            discount_amount = (subtotal * percentage) / Decimal('100.00')
+        elif discount_value == '1+1':
+            # Buy one get one free - 50% off if buying even number of items
+            total_items = sum(item.quantity for item in cart.cart_items.all())
+            if total_items % 2 == 0:
+                discount_amount = subtotal * Decimal('0.50')
+            else:
+                discount_amount = (subtotal * Decimal('0.50')) - (subtotal / total_items / Decimal('2.00'))
+        elif discount_value == 'FREE ITEM':
+            # Find the lowest priced item and make it free
+            min_price_item = min(cart.cart_items.all(), key=lambda x: x.unit_price)
+            discount_amount = min_price_item.unit_price
+        else:
+            # For other special cases like PRE ORDER, LATE NIGHT, QOUPON+
+            # You can implement specific logic for each case
+            discount_amount = Decimal('0.00')
     
     total_amount = subtotal + delivery_fee - discount_amount
     
@@ -245,7 +520,23 @@ def create_order(request):
             'quantity': item.quantity,
             'unit_price': str(item.unit_price),
             'total': str(item.item_total),
-            'image': item.deal.image.url if item.deal.image else None
+            'image': item.deal.image.url if item.deal.image else None,
+            'modifiers': [{
+                'name': modifier_group['name'],
+                'is_required': modifier_group['is_required'],
+                'selections': [
+                    {
+                        'title': option['title'],
+                        'price': str(option.get('Price', '0.00'))
+                    }
+                    for option in modifier_group['options']
+                    if any(selection == option['title'] 
+                          for selection in next((s['selected_options'] 
+                                               for s in item.selected_modifiers 
+                                               if s['group_name'] == modifier_group['name']), 
+                                              []))
+                ]
+            } for modifier_group in item.deal.modifiers]
         } for item in cart.cart_items.all()],
         'subtotal': str(subtotal),
         'delivery_fee': str(delivery_fee),
@@ -279,15 +570,28 @@ def create_order(request):
     
     # Create order items
     for cart_item in cart.cart_items.all():
-        OrderItem.objects.create(
+        # Validate required modifiers
+        try:
+            cart_item.validate_modifiers()
+        except ValueError as e:
+            # Roll back the transaction
+            transaction.set_rollback(True)
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Create order item with selected modifiers
+        order_item = OrderItem.objects.create(
             order=order,
             deal=cart_item.deal,
             quantity=cart_item.quantity,
-            unit_price=cart_item.deal.price,
-            total_price=cart_item.item_total,
             item_name=cart_item.deal.title,
             item_description=cart_item.deal.description,
-            item_image=cart_item.deal.image.url if cart_item.deal.image else None
+            selected_modifiers=cart_item.selected_modifiers,  # Copy JSON-based modifiers directly
+            unit_price=cart_item.unit_price,
+            modifiers_price=cart_item.modifiers_price,
+            total_price=cart_item.item_total
         )
     
     # Create applied deal if exists
@@ -299,6 +603,8 @@ def create_order(request):
             deal_title=deal.title,
             deal_description=deal.description
         )
+        deal.redemption += 1
+        deal.save()
     
     # Create initial tracking
     OrderTracking.objects.create(

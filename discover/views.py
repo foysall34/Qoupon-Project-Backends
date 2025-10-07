@@ -389,7 +389,7 @@ class AllReviewView(APIView):
 
 
 
-class ReviewReplyView(APIView):
+class ReviewReplyViewDetails(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, review_id, format=None):

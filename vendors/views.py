@@ -128,6 +128,15 @@ class DealViewSet(viewsets.ModelViewSet):
         else:
             # If validation fails, return the errors in the response
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        
+
+    def partial_destroy(self, request, *args, **kwargs):
+        """
+        Handle partial delete (DELETE request) for a deal.
+        """
+        instance = self.get_object() 
+        self.perform_destroy(instance)
+        return Response({"message": "delete successful"}, status=status.HTTP_204_NO_CONTENT)
 
 
 

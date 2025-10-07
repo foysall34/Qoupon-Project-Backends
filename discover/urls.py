@@ -31,8 +31,8 @@ urlpatterns = [
     path('my-reviews/', views.MyReviewListView.as_view(), name='my-review-list'),
     path('menu/categories/', views.MenuCategoryView.as_view(), name='menu-category-list'), 
     path('menu/items/<int:pk>/', views.MenuItemsView.as_view(), name='menu-item-list'),
-    path('review/reply/<int:review_id>/', views.ReviewReplyView.as_view(), name='review-reply'),
-    path('review/reply/<int:review_id>/', views.ReviewReplyView.as_view(), name='review-reply-list'),
+    path('review/reply/<int:review_id>/', views.ReviewReplyViewDetails.as_view(), name='review-reply'),
+    path('review/reply/create/<int:review_id>/', views.ReviewReplyView.as_view(), name='review-reply-list'),
     path('all-reviews/', views.AllReviewView.as_view(), name='all-reviews-list'),
 
    

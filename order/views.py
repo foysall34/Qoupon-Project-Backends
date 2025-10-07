@@ -698,8 +698,23 @@ def process_payment(request, order_id):
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def cancel_order(request, order_id):
-    """Cancel an order"""
-    order = get_object_or_404(Order, order_id=order_id, user=request.user)
+    """Cancel an order - Both customers and vendors can cancel orders"""
+    order = get_object_or_404(Order, order_id=order_id)
+    cancellation_reason = request.data.get('cancellation_reason', '')
+    
+    # Check if user is a vendor
+    is_vendor = False
+    try:
+        vendor_profile = Business_profile.objects.get(owner=request.user)
+        # Verify vendor has items in this order
+        if order.items.filter(deal__user=request.user).exists():
+            is_vendor = True
+    except Business_profile.DoesNotExist:
+        pass
+    
+    # If not vendor, must be the order owner
+    if not is_vendor and order.user != request.user:
+        raise PermissionDenied("You can only cancel your own orders")
     
     if order.status in [Order.OrderStatus.COMPLETED, Order.OrderStatus.CANCELLED]:
         return Response(
@@ -710,44 +725,81 @@ def cancel_order(request, order_id):
     order.status = Order.OrderStatus.CANCELLED
     order.save()
     
+    # Set appropriate cancellation note based on who cancelled
+    if is_vendor:
+        note = f"Order cancelled by vendor {vendor_profile.name}: {cancellation_reason}" if cancellation_reason else f"Order cancelled by vendor {vendor_profile.name}"
+    else:
+        note = f"Order cancelled by customer: {cancellation_reason}" if cancellation_reason else "Order cancelled by customer"
+    
     OrderTracking.objects.create(
         order=order,
         status=Order.OrderStatus.CANCELLED,
-        note=request.data.get('cancellation_reason', 'Order cancelled by user')
+        note=note
     )
 
-    # Send notification to customer
-    FirebaseNotification.send_to_user(
-        user=request.user,
-        title="Order Cancelled",
-        body=f"Your order #{order.order_id} has been cancelled",
-        data={
-            'order_id': str(order.order_id),
-            'status': Order.OrderStatus.CANCELLED,
-            'type': 'order_cancelled'
-        },
-        notification_type='order_status'
-    )
+    # Send notification based on who cancelled the order
+    if is_vendor:
+        # Notify customer
+        FirebaseNotification.send_to_user(
+            user=order.user,
+            title="Order Cancelled",
+            body=f"Your order #{order.order_id} has been cancelled by vendor: {cancellation_reason if cancellation_reason else 'No reason provided'}",
+            data={
+                'order_id': str(order.order_id),
+                'status': Order.OrderStatus.CANCELLED,
+                'type': 'order_cancelled',
+                'cancelled_by': 'vendor',
+                'reason': cancellation_reason
+            },
+            notification_type='order_status'
+        )
 
-    # Notify vendor(s)
-    for vendor_id in order.items.values_list('deal__user', flat=True).distinct():
-        try:
-            vendor = type(order.user).objects.get(id=vendor_id)
-            FirebaseNotification.send_to_user(
-                user=vendor,
-                title="Order Cancelled",
-                body=f"Order #{order.order_id} has been cancelled by the customer",
-                data={
-                    'order_id': str(order.order_id),
-                    'status': Order.OrderStatus.CANCELLED,
-                    'type': 'order_cancelled'
-                },
-                notification_type='order_status'
-            )
-        except Exception as e:
-            logger.error(f"Failed to send vendor notification: {e}")
+        # Notify other vendors if any
+        for vendor_id in order.items.values_list('deal__user', flat=True).distinct():
+            if vendor_id != request.user.id:  # Don't notify the cancelling vendor
+                try:
+                    other_vendor = type(order.user).objects.get(id=vendor_id)
+                    FirebaseNotification.send_to_user(
+                        user=other_vendor,
+                        title="Order Cancelled",
+                        body=f"Order #{order.order_id} has been cancelled by another vendor: {cancellation_reason if cancellation_reason else 'No reason provided'}",
+                        data={
+                            'order_id': str(order.order_id),
+                            'status': Order.OrderStatus.CANCELLED,
+                            'type': 'order_cancelled',
+                            'cancelled_by': 'vendor',
+                            'reason': cancellation_reason
+                        },
+                        notification_type='order_status'
+                    )
+                except Exception as e:
+                    logger.error(f"Failed to send vendor notification: {e}")
+    else:
+        # Customer cancelled - notify all vendors
+        for vendor_id in order.items.values_list('deal__user', flat=True).distinct():
+            try:
+                vendor = type(order.user).objects.get(id=vendor_id)
+                FirebaseNotification.send_to_user(
+                    user=vendor,
+                    title="Order Cancelled",
+                    body=f"Order #{order.order_id} has been cancelled by the customer: {cancellation_reason if cancellation_reason else 'No reason provided'}",
+                    data={
+                        'order_id': str(order.order_id),
+                        'status': Order.OrderStatus.CANCELLED,
+                        'type': 'order_cancelled',
+                        'cancelled_by': 'customer',
+                        'reason': cancellation_reason
+                    },
+                    notification_type='order_status'
+                )
+            except Exception as e:
+                logger.error(f"Failed to send vendor notification: {e}")
     
-    return Response({'message': 'Order cancelled successfully'})
+    return Response({
+        'message': 'Order cancelled successfully',
+        'cancelled_by': 'vendor' if is_vendor else 'customer',
+        'reason': cancellation_reason if cancellation_reason else None
+    })
  
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])

@@ -471,7 +471,9 @@ class SendDealNotification(APIView):
                 notification_type="promotion"
             ):
                 success_count += 1
-
+        if success_count > 0:
+            deal.push_sent_count += success_count
+            deal.save()
         return Response(
             {
                 "detail": f"Notifications sent to {success_count} users.",

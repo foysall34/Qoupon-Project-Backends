@@ -157,6 +157,7 @@ class Create_Deal(models.Model):
     view_count = models.PositiveIntegerField(default=0)
     activation = models.PositiveIntegerField(default=0)
     redemption = models.PositiveIntegerField(default=0)
+    push_sent_count = models.PositiveIntegerField(default=0)
 
     def __str__(self):
         return self.title

@@ -154,3 +154,24 @@ class SearchHistoryView(APIView):
         search_histories = user.search_histories.all().order_by('-searched_at')  # Assuming related_name is 'search_histories'
         serializer = SearchHistorySerializer(search_histories, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
+    
+
+class AllSearchHistoryView(APIView):
+
+    def get(self, request):
+        search_histories = SearchHistory.objects.all().order_by('-searched_at')
+        serializer = SearchHistorySerializer(search_histories, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    
+
+class SearchHistoryDeleteView(APIView):
+
+    def delete(self, request, pk):
+        user = request.user
+        try:
+            search_history = SearchHistory.objects.get(pk=pk, user=user)
+        except SearchHistory.DoesNotExist:
+            return Response({'error': 'Search history not found.'}, status=status.HTTP_404_NOT_FOUND)
+        
+        search_history.delete()
+        return Response({'message': 'Search history deleted.'}, status=status.HTTP_204_NO_CONTENT)

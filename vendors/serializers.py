@@ -231,6 +231,7 @@ class Create_DealSerializer(serializers.ModelSerializer):
             'view_count',
             'activation',
             'redemption',
+            'push_sent_count'
         ]
         extra_kwargs = {
             'image': {'write_only': True, 'required': False}

@@ -167,8 +167,9 @@ def add_to_cart(request):
             )
 
     # Create or update cart item
-    # Show required modifiers if none provided
-    if not selected_modifiers:
+    # Show required modifiers if none provided and modifiers exist
+    if not selected_modifiers and deal.modifiers:
+        # Only return required modifiers response if there are modifiers defined
         required_modifiers = [
             {
                 'group_name': group['name'],
@@ -177,20 +178,26 @@ def add_to_cart(request):
             }
             for group in deal.modifiers
         ]
+        example_payload = {
+            'menu_item_id': deal.id,
+            'quantity': quantity
+        }
+        
+        # Only add selected_modifiers to example if there are required modifiers
+        required_groups = [group for group in deal.modifiers if group['is_required']]
+        if required_groups:
+            example_payload['selected_modifiers'] = [
+                {
+                    'group_name': group['name'],
+                    'selected_options': ['Select an option from available options']
+                }
+                for group in required_groups
+            ]
+        
         return Response({
             'error': 'Please select required modifiers',
             'required_modifiers': required_modifiers,
-            'example_payload': {
-                'menu_item_id': deal.id,
-                'quantity': quantity,
-                'selected_modifiers': [
-                    {
-                        'group_name': group['name'],
-                        'selected_options': ['Select an option from available options']
-                    }
-                    for group in deal.modifiers if group['is_required']
-                ]
-            }
+            'example_payload': example_payload
         }, status=status.HTTP_400_BAD_REQUEST)
 
     cart_item, created = CartItem.objects.get_or_create(
@@ -430,6 +437,7 @@ def create_order(request):
     """Create a new order from cart with initial PENDING_PAYMENT status"""
     cart = get_object_or_404(Cart, user=request.user)
     deal_id = request.data.get('deal_id')
+    payment_method = request.data.get('payment_method', 'MOLLIE')
     
     if not cart.cart_items.exists():
         return Response(
@@ -551,7 +559,11 @@ def create_order(request):
             'discount_amount': str(discount_amount)
         }
     
-    # Create order with PENDING_PAYMENT status
+    # Set initial order status based on payment method
+    # For cash payment: Order is RECEIVED but payment stays PENDING until delivery verification
+    initial_status = Order.OrderStatus.RECEIVED if payment_method == Order.PaymentMethod.CASH else Order.OrderStatus.PENDING_PAYMENT
+    initial_payment_status = Order.PaymentStatus.PENDING  # Payment status stays pending for both cash and online payments
+    
     order = Order.objects.create(
         user=request.user,
         cart_snapshot=cart_data,
@@ -565,7 +577,9 @@ def create_order(request):
         delivery_fee=delivery_fee,
         discount_amount=discount_amount,
         total_amount=total_amount,
-        status=Order.OrderStatus.PENDING_PAYMENT
+        status=initial_status,
+        payment_method=payment_method,
+        payment_status=initial_payment_status
     )
     
     # Create order items
@@ -606,25 +620,53 @@ def create_order(request):
         deal.redemption += 1
         deal.save()
     
-    # Create initial tracking
+    # Create initial tracking with appropriate message
+    tracking_note = 'Order received (Cash payment)' if payment_method == Order.PaymentMethod.CASH else 'Order created, awaiting payment'
     OrderTracking.objects.create(
         order=order,
-        status=Order.OrderStatus.PENDING_PAYMENT,
-        note='Order created, awaiting payment'
+        status=order.status,
+        note=tracking_note
     )
     
     # Send notification to customer
+    notification_message = (
+        f"Your order #{order.order_id} has been received (Cash payment)" 
+        if payment_method == Order.PaymentMethod.CASH
+        else f"Your order #{order.order_id} has been created and is awaiting payment"
+    )
+    
     FirebaseNotification.send_to_user(
         user=request.user,
         title="Order Created",
-        body=f"Your order #{order.order_id} has been created and is awaiting payment",
+        body=notification_message,
         data={
             'order_id': str(order.order_id),
             'status': order.status,
-            'type': 'order_created'
+            'type': 'order_created',
+            'payment_method': payment_method
         },
         notification_type='order_status'
     )
+    
+    # If it's a cash payment, notify vendors immediately since order is received
+    if payment_method == Order.PaymentMethod.CASH:
+        for vendor_id in order.items.values_list('deal__user', flat=True).distinct():
+            try:
+                vendor = type(order.user).objects.get(id=vendor_id)
+                FirebaseNotification.send_to_user(
+                    user=vendor,
+                    title="New Order Received",
+                    body=f"You have received a new order #{order.order_id} (Cash payment)",
+                    data={
+                        'order_id': str(order.order_id),
+                        'status': order.status,
+                        'type': 'new_order',
+                        'payment_method': 'CASH'
+                    },
+                    notification_type='order_status'
+                )
+            except Exception as e:
+                logger.error(f"Failed to send vendor notification: {e}")
 
     serializer = OrderSerializer(order)
     return Response(serializer.data, status=status.HTTP_201_CREATED)
@@ -1069,24 +1111,40 @@ def verify_delivery(request, order_id):
     # Mark delivery as verified and complete the order
     order.delivery_code_used = True
     order.status = Order.OrderStatus.COMPLETED
+
+    # Update payment status for cash payments
+    if order.payment_method == Order.PaymentMethod.CASH:
+        order.payment_status = Order.PaymentStatus.PAID
+        payment_note = ' - Cash payment received'
+    else:
+        payment_note = ''
+
     order.save()
     
     # Create tracking entry
     OrderTracking.objects.create(
         order=order,
         status=Order.OrderStatus.COMPLETED,
-        note='Order completed - verified via QR code'
+        note=f'Order completed - verified via QR code{payment_note}'
     )
 
     # Send notification to customer
+    notification_msg = (
+        f"Your order #{order.order_id} has been completed and payment received"
+        if order.payment_method == Order.PaymentMethod.CASH
+        else f"Your order #{order.order_id} has been completed"
+    )
+    
     FirebaseNotification.send_to_user(
         user=order.user,
         title="Order Completed",
-        body=f"Your order #{order.order_id} has been completed",
+        body=notification_msg,
         data={
             'order_id': str(order.order_id),
             'status': order.status,
-            'type': 'order_completed'
+            'payment_status': order.payment_status,
+            'type': 'order_completed',
+            'payment_method': order.payment_method
         },
         notification_type='order_status'
     )
@@ -1095,14 +1153,24 @@ def verify_delivery(request, order_id):
     for vendor_id in order.items.values_list('deal__user', flat=True).distinct():
         try:
             vendor = type(order.user).objects.get(id=vendor_id)
+            
+            # Different message for cash payments
+            vendor_msg = (
+                f"Order #{order.order_id} has been completed successfully and cash payment received"
+                if order.payment_method == Order.PaymentMethod.CASH
+                else f"Order #{order.order_id} has been completed successfully"
+            )
+            
             FirebaseNotification.send_to_user(
                 user=vendor,
                 title="Order Completed",
-                body=f"Order #{order.order_id} has been completed successfully",
+                body=vendor_msg,
                 data={
                     'order_id': str(order.order_id),
                     'status': order.status,
-                    'type': 'order_completed'
+                    'payment_status': order.payment_status,
+                    'type': 'order_completed',
+                    'payment_method': order.payment_method
                 },
                 notification_type='order_status'
             )

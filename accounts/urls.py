@@ -24,4 +24,5 @@ urlpatterns = [
     path('forgot-password/', ForgotPasswordView.as_view(), name='forgot-password'),
     path('set-new-password/', SetNewPasswordView.as_view(), name='set-new-password'),
     path('search-history/', SearchHistoryView.as_view(), name='search-history'),
+    path('all-search-history/', SearchHistoryView.as_view(), name='all-search-history'),
 ]

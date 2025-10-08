@@ -146,6 +146,11 @@ class Order(models.Model):
     class OrderType(models.TextChoices):
         STANDARD = 'STANDARD', 'Standard Order'
         SCHEDULED = 'SCHEDULED', 'Scheduled Order'
+    
+    class PaymentMethod(models.TextChoices):
+        MOLLIE = 'MOLLIE', 'Mollie'
+        CASH = 'CASH', 'Cash on Delivery/Pickup'
+        
  
     order_id = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='user_orders')
@@ -154,6 +159,7 @@ class Order(models.Model):
     
     # Order Status
     status = models.CharField(max_length=20, choices=OrderStatus.choices, default=OrderStatus.RECEIVED)
+    payment_method = models.CharField(max_length=50, choices=PaymentMethod.choices, null=True, blank=True, default=PaymentMethod.MOLLIE)
     payment_status = models.CharField(max_length=20, choices=PaymentStatus.choices, default=PaymentStatus.PENDING)
     delivery_type = models.CharField(max_length=10, choices=DeliveryType.choices)
     
@@ -211,11 +217,10 @@ class Order(models.Model):
             self.delivery_code = self.generate_delivery_code()
             self.delivery_code_created_at = timezone.now()
  
-        # Status changed to RECEIVED → generate QR code only if it doesn't exist
+        # Generate QR code for new RECEIVED orders or when status changes to RECEIVED
         if (
-            old_status
-            and old_status != self.OrderStatus.RECEIVED
-            and self.status == self.OrderStatus.RECEIVED
+            (is_new and self.status == self.OrderStatus.RECEIVED) or
+            (old_status and old_status != self.OrderStatus.RECEIVED and self.status == self.OrderStatus.RECEIVED)
         ):
             if not self.delivery_code:
                 self.delivery_code = self.generate_delivery_code()

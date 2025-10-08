@@ -448,7 +448,8 @@ class SendDealNotification(APIView):
         deal_data = {
             "deal_id": str(deal.id),
             "title": deal.title,
-            "discount_value": str(deal.discount_value),
+            "discount_value_free": str(deal.discount_value_free),
+            "discount_value_paid": str(deal.discount_value_paid),
             "type": "new_deal"
         }
 

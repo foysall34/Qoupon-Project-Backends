@@ -21,16 +21,8 @@ class Cart(models.Model):
         return sum(item.item_total for item in self.cart_items.all())
     
     @property
-    def delivery_fee(self):
-        # Can be made more sophisticated based on distance, order value, etc.
-        base_delivery_fee = Decimal('2.99')
-        if self.subtotal > Decimal('25.00'):  # Free delivery over $25
-            return Decimal('0.00')
-        return base_delivery_fee
-    
-    @property
     def final_total(self):
-        return self.subtotal + self.delivery_fee
+        return self.subtotal
     
     def clear(self):
         self.cart_items.all().delete()
@@ -165,7 +157,7 @@ class Order(models.Model):
     
     # Amounts
     subtotal = models.DecimalField(max_digits=10, decimal_places=2)
-    delivery_fee = models.DecimalField(max_digits=6, decimal_places=2, default=0)
+    delivery_fee = models.FloatField(default=0.00)
     discount_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     total_amount = models.DecimalField(max_digits=10, decimal_places=2)
     

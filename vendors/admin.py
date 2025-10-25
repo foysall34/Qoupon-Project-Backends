@@ -1,7 +1,7 @@
 from django.contrib import admin
 
 # Register your models here.
-from .models import Business_profile, Business_profile_Category, Deal, Vendor_Category,ModifierGroup, Create_Deal,DeliveryCost, WishDeal, DealTimeSlot, Create_Deal, DealTimeSlot
+from .models import BusinesDeliveryCost, Business_profile, Business_profile_Category, Deal, Label, Vendor_Category,ModifierGroup, Create_Deal,DeliveryCost, WishDeal, DealTimeSlot, Create_Deal, DealTimeSlot, DeliveryCost
 
 
 class BusinessProfileCategoryAdmin(admin.ModelAdmin):
@@ -137,6 +137,19 @@ class DealTimeSlotAdmin(admin.ModelAdmin):
     search_fields = ('deal__title', 'day')  
     ordering = ('deal', 'day')
 
+
+class BusinesDeliveryCostAdmin(admin.ModelAdmin):
+    list_display = ('id', 'business_profile', 'zip_code', 'amount')
+    search_fields = ('business_profile__name', 'zip_code')
+    ordering = ('business_profile',)
+admin.site.register(BusinesDeliveryCost, BusinesDeliveryCostAdmin)
+
+
+class LabelAdmin(admin.ModelAdmin):
+    list_display = ('id', 'name')
+    search_fields = ('name',)
+    ordering = ('name',)
+admin.site.register(Label, LabelAdmin)
 
 
 

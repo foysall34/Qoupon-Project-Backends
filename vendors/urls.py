@@ -16,7 +16,8 @@ urlpatterns = [
     path('', include(router.urls)),
     path('business-profile/', CreateStoreView.as_view(), name='create-store'),
     path('all-business-profile/', AllBusinessProfilesListView.as_view(), name='all-stores-list'),
-    path('businessh-profile/manage/', CreateStoreViewPatch.as_view(), name='store-detail'),
+    path('business-profile/manage/', CreateStoreViewPatch.as_view(), name='store-detail'),
+
     path('mymenu-category/', categoryItemListView.as_view(), name='menu-item-list'),
     path('upload/', ImageUploadView.as_view(), name='image-upload'),
     path('all-deals/', views.AllDealsView.as_view(), name='all-deals-list'),
@@ -34,5 +35,6 @@ urlpatterns = [
     path("vendors/<int:vendor_id>/unfollow/", views.UnfollowVendorAPIView.as_view(), name="unfollow-vendor"),
     path("customers/followed-vendors/", views.FollowedVendorsListAPIView.as_view(), name="followed-vendors"),
     path("vendors/followers/", views.VendorFollowersListAPIView.as_view(), name="vendor-followers"),
+    path("labels/", views.LabelListView.as_view(), name="label-list"),
 
 ]       

@@ -1,4 +1,5 @@
 
+from .models import BusinesDeliveryCost, Label
 from rest_framework import serializers
 from django_filters.rest_framework import DjangoFilterBackend
 from django.contrib.auth import get_user_model
@@ -33,14 +34,17 @@ class BusinessProfileCategorySerializer(serializers.ModelSerializer):
             return obj.category_image.url
         return None
 
-
-
+class BusinessDeliveryCostSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = BusinesDeliveryCost
+        fields = ['id', 'zip_code', 'amount', 'min_order_amount']
 
 
 class Business_profile_Serializer(serializers.ModelSerializer):
-    vendor_email = serializers.ReadOnlyField(source='owner.email') 
-    vendor_id = serializers.ReadOnlyField(source = 'owner.id' )
+    vendor_email = serializers.ReadOnlyField(source='owner.email')
+    vendor_id = serializers.ReadOnlyField(source='owner.id')
     logo_image = serializers.SerializerMethodField()
+    delivery_costs = BusinessDeliveryCostSerializer(many=True, required=False)
 
     class Meta:
         model = Business_profile
@@ -53,24 +57,51 @@ class Business_profile_Serializer(serializers.ModelSerializer):
             'logo_image',
             'kvk_number',
             'phone_number',
+            'label',
             'address',
-            'category'
+            'category',
+            'delivery_costs',
         ]
-
         extra_kwargs = {
-            
-            'logo': {
-            'write_only': True,
-            'required': True 
-            
-            },
-       
-         }
-        
+            'logo': {'write_only': True, 'required': False},  # allow patch without logo
+        }
+
     def get_logo_image(self, obj):
-        if obj.logo:
-            return obj.logo.url
-        return None
+        return obj.logo.url if obj.logo else None
+
+    def create(self, validated_data):
+        delivery_costs_data = validated_data.pop('delivery_costs', [])
+        business_profile = Business_profile.objects.create(**validated_data)
+        for cost_data in delivery_costs_data:
+            BusinesDeliveryCost.objects.create(business_profile=business_profile, **cost_data)
+        return business_profile
+
+    def update(self, instance, validated_data):
+        """
+        Custom update logic for PATCH/PUT requests.
+        - Updates top-level fields
+        - Handles nested delivery_cost updates
+        """
+        # Extract nested data
+        delivery_costs_data = validated_data.pop('delivery_costs', None)
+
+        # Update simple fields
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+
+        # ✅ Handle delivery cost updates if provided
+        if delivery_costs_data is not None:
+            # Clear old delivery costs
+            instance.delivery_costs.all().delete()
+            # Create new ones
+            for cost_data in delivery_costs_data:
+                BusinesDeliveryCost.objects.create(business_profile=instance, **cost_data)
+
+        return instance
+
+
+
 
 from django.contrib.auth import get_user_model
 from rest_framework import serializers
@@ -298,3 +329,9 @@ class WishDealSerializer(serializers.ModelSerializer):
         model = WishDeal
         fields = ['id', 'user', 'deal', 'added_at']
         read_only_fields = ['id', 'added_at']
+
+
+class LabelSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Label
+        fields = ['id', 'name']

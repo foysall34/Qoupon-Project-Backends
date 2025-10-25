@@ -16,6 +16,7 @@ from django.utils import timezone
 from datetime import timedelta
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny
+from rest_framework_simplejwt.tokens import RefreshToken
 
 
 
@@ -175,3 +176,42 @@ class SearchHistoryDeleteView(APIView):
         
         search_history.delete()
         return Response({'message': 'Search history deleted.'}, status=status.HTTP_204_NO_CONTENT)
+    
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def social_signup_signup(request):
+    email = request.data.get('email')
+    user_type = request.data.get('user_type')
+    auth_provider = request.data.get('auth_provider')
+ 
+    if not email or not user_type or not auth_provider:
+        return Response({
+            "email": "This field is required." ,
+            "user_type": "This field is required." ,
+            "auth_provider": "This field is required." ,
+        }, status=400)
+ 
+    user, created = User.objects.get_or_create(
+        email=email,
+        defaults={'email':email, 'user_type': user_type}
+    )
+ 
+    refresh = RefreshToken.for_user(user)
+    access_token = refresh.access_token
+    token = {
+        'refresh': str(refresh),
+        'access': str(access_token),
+    }
+ 
+    user_details = {
+        'id': user.id,
+        'user_type': user.user_type,
+        'email': user.email
+    }
+ 
+    return Response({
+        'message': 'Successfully authenticated.',
+        'user': user_details,
+        'token': token,
+    }, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)

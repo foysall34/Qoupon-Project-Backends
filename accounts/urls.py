@@ -5,7 +5,8 @@ from .views import (
     ForgotPasswordView,
     SetNewPasswordView,
     CustomLoginView,
-    SearchHistoryView
+    SearchHistoryView,
+    social_signup_signup
 )
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
@@ -25,4 +26,5 @@ urlpatterns = [
     path('set-new-password/', SetNewPasswordView.as_view(), name='set-new-password'),
     path('search-history/', SearchHistoryView.as_view(), name='search-history'),
     path('all-search-history/', SearchHistoryView.as_view(), name='all-search-history'),
+    path('social-signin/', social_signup_signup, name='social_signup_signup'),
 ]

@@ -63,7 +63,6 @@ def get_cart(request):
         'id': cart.id,
         'total_items': cart.total_items,
         'subtotal': str(cart.subtotal),
-        'delivery_fee': str(cart.delivery_fee),
         'total_discount': str(applied_discount),
         'final_total': str(cart.final_total),
         'items': [{
@@ -345,10 +344,10 @@ def calculate_checkout(request):
     """Calculate final order amount with deal if provided"""
     cart = get_object_or_404(Cart, user=request.user)
     deal_id = request.data.get('deal_id')
+    delivery_fee = request.data.get('delivery_fee')
     
     checkout_data = {
         'subtotal': str(cart.subtotal),
-        'delivery_fee': str(cart.delivery_fee),
         'discount_amount': '0.00',
         'final_total': str(cart.final_total)
     }
@@ -401,7 +400,7 @@ def calculate_checkout(request):
             
         checkout_data.update({
             'discount_amount': str(discount),
-            'final_total': str(cart.subtotal + cart.delivery_fee - discount),
+            'final_total': str(cart.subtotal + delivery_fee - discount),
             'applied_deal': {
                 'id': deal.id,
                 'title': deal.title,
@@ -437,7 +436,19 @@ def create_order(request):
     """Create a new order from cart with initial PENDING_PAYMENT status"""
     cart = get_object_or_404(Cart, user=request.user)
     deal_id = request.data.get('deal_id')
+    delivery_fee = request.data.get('delivery_fee')
     payment_method = request.data.get('payment_method', 'MOLLIE')
+
+    from decimal import Decimal, InvalidOperation
+    delivery_fee_raw = request.data.get('delivery_fee', 0)
+
+    try:
+        delivery_fee = Decimal(str(delivery_fee_raw))
+    except (InvalidOperation, TypeError, ValueError):
+        return Response(
+            {'error': 'Invalid delivery_fee format. It must be a number.'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
     
     if not cart.cart_items.exists():
         return Response(
@@ -470,7 +481,6 @@ def create_order(request):
     
     # Calculate totals including deal if provided
     subtotal = cart.subtotal     
-    delivery_fee = cart.delivery_fee
     discount_amount = Decimal('0.00')
     subscription = Subscription.objects.filter(user=request.user).last()
     is_subscribed = subscription and subscription.is_active

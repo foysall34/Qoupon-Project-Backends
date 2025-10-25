@@ -13,6 +13,12 @@ class Business_profile_Category(models.Model):
     
     def __str__(self):
         return self.name
+    
+class Label(models.Model):
+    name = models.CharField(max_length=100, unique=True)
+
+    def __str__(self):
+        return self.name
 
 class Business_profile(models.Model):
     owner = models.OneToOneField(settings.AUTH_USER_MODEL,on_delete=models.CASCADE,related_name='business_profile')
@@ -22,6 +28,13 @@ class Business_profile(models.Model):
     phone_number = models.CharField(max_length=20, verbose_name="Phone Number")
     address = models.TextField(verbose_name="Store Address")
     category = models.ForeignKey(Business_profile_Category, on_delete=models.CASCADE)
+    label = models.ForeignKey(
+        Label,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='business_profiles'
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     # ✅ single source of truth: users who follow this business
@@ -29,6 +42,16 @@ class Business_profile(models.Model):
 
     def __str__(self):
         return self.name
+    
+
+class BusinesDeliveryCost(models.Model):
+    business_profile = models.ForeignKey(Business_profile, on_delete=models.CASCADE, related_name='delivery_costs')
+    zip_code = models.CharField(max_length=20)
+    amount = models.DecimalField(max_digits=6, decimal_places=2)
+    min_order_amount = models.DecimalField(max_digits=10, decimal_places=2, default = 0.0)
+    
+    def __str__(self):
+        return f"{self.business_profile.name} - {self.zip_code}"
     
 
 class Vendor_Category(models.Model):

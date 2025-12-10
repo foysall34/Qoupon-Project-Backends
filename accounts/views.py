@@ -197,7 +197,7 @@ def social_signup_signup(request):
         defaults={'email':email, 'user_type': user_type}
     )
  
-    refresh = RefreshToken.for_user(user)
+    refresh = RefreshToken.for_user(user)   
     access_token = refresh.access_token
     token = {
         'refresh': str(refresh),

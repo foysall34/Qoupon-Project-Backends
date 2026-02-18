@@ -18,3 +18,8 @@ class ReportIssueSerializer(serializers.ModelSerializer):
         if not value.is_active:
             raise serializers.ValidationError("This issue type is not available.")
         return value
+    
+class IssueTypeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = IssueType
+        fields = ["id", "name", "is_active"]

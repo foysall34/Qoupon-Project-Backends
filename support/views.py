@@ -3,7 +3,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from .models import FAQ, ReportIssue, IssueType
-from .serializers import FAQSerializer, ReportIssueSerializer
+from .serializers import FAQSerializer, IssueTypeSerializer, ReportIssueSerializer
 from rest_framework import permissions
 from rest_framework.parsers import MultiPartParser, FormParser
 
@@ -43,3 +43,10 @@ class ReportIssueCreateAPI(APIView):
                 status=status.HTTP_201_CREATED
             )
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+
+class IssueTypeListView(APIView):
+    def get(self, request, format=None):
+        issue_types = IssueType.objects.all()
+        serializer = IssueTypeSerializer(issue_types, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
